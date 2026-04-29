@@ -142,7 +142,7 @@ sources:
     enabled: true
 ranker:
   top_k_for_llm_rerank: 30
-  embedding_model: bge-small-en-v1.5
+  embedding_model: BAAI/bge-small-en-v1.5
   rerank_model: claude-haiku-4-5-20251001
 tailor:
   model: claude-sonnet-4-6
