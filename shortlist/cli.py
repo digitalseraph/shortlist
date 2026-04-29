@@ -114,6 +114,10 @@ seniority:
   - senior
   - staff
 greenhouse_companies: []
+lever_companies: []
+ashby_companies: []
+workable_companies: []
+smartrecruiters_companies: []
 """
 
 

@@ -15,3 +15,11 @@ seniority:
 greenhouse_companies:
   - acme
   - globex
+lever_companies:
+  - acme
+ashby_companies:
+  - acme
+workable_companies:
+  - acme
+smartrecruiters_companies:
+  - Acme

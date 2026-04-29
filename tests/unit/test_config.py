@@ -54,3 +54,29 @@ def test_prefs_rejects_empty_titles():
                 "greenhouse_companies": [],
             }
         )
+
+
+def test_load_prefs_includes_all_ats_company_lists():
+    prefs = load_prefs(FIXTURES / "prefs_default.yaml")
+    assert prefs.lever_companies == ["acme"]
+    assert prefs.ashby_companies == ["acme"]
+    assert prefs.workable_companies == ["acme"]
+    assert prefs.smartrecruiters_companies == ["Acme"]
+
+
+def test_prefs_defaults_to_empty_lists_when_omitted():
+    p = Prefs.model_validate(
+        {
+            "titles": ["Eng"],
+            "locations": ["Remote"],
+            "remote_ok": True,
+            "comp_floor_usd": 100000,
+            "exclude_keywords": [],
+            "seniority": [],
+            "greenhouse_companies": [],
+        }
+    )
+    assert p.lever_companies == []
+    assert p.ashby_companies == []
+    assert p.workable_companies == []
+    assert p.smartrecruiters_companies == []

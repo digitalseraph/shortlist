@@ -67,8 +67,22 @@ class Prefs(BaseModel):
     exclude_keywords: list[str]
     seniority: list[str]
     greenhouse_companies: list[str] = Field(default_factory=list)
+    lever_companies: list[str] = Field(default_factory=list)
+    ashby_companies: list[str] = Field(default_factory=list)
+    workable_companies: list[str] = Field(default_factory=list)
+    smartrecruiters_companies: list[str] = Field(default_factory=list)
 
-    @field_validator("titles", "locations", "exclude_keywords", "seniority", "greenhouse_companies")
+    @field_validator(
+        "titles",
+        "locations",
+        "exclude_keywords",
+        "seniority",
+        "greenhouse_companies",
+        "lever_companies",
+        "ashby_companies",
+        "workable_companies",
+        "smartrecruiters_companies",
+    )
     @classmethod
     def _strip(cls, v: list[str]) -> list[str]:
         return [s.strip() for s in v if s.strip()]
