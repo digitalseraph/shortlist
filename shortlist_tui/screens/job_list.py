@@ -21,6 +21,7 @@ class JobListScreen(Screen[None]):
         Binding("g", "cursor_top", "Top", show=False),
         Binding("G", "cursor_bottom", "Bottom", show=False),
         Binding("r", "refresh", "Refresh"),
+        Binding("t", "tailor", "Tailor"),
     ]
 
     def __init__(self, db_path: Path) -> None:
@@ -80,6 +81,13 @@ class JobListScreen(Screen[None]):
         from shortlist_tui.screens.job_detail import JobDetailScreen
 
         self.app.push_screen(JobDetailScreen(self._db, row.id))
+
+    def action_tailor(self) -> None:
+        table = self.query_one(DataTable)
+        if table.cursor_row < 0 or table.cursor_row >= len(self._rows):
+            return
+        row = self._rows[table.cursor_row]
+        self.app._tailor_worker(row.id)  # type: ignore[attr-defined]
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Open JobDetail when the user confirms a row (enter key on DataTable)."""
