@@ -1,0 +1,25 @@
+{
+  "jobs": [
+    {
+      "id": 4521,
+      "internal_job_id": 4521,
+      "title": "Senior Backend Engineer",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4521",
+      "updated_at": "2026-04-25T09:00:00-04:00",
+      "location": {"name": "Remote - US"},
+      "content": "%3Cp%3EBuild distributed systems in Python.%3C%2Fp%3E",
+      "metadata": null
+    },
+    {
+      "id": 4522,
+      "internal_job_id": 4522,
+      "title": "Staff Platform Engineer",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4522",
+      "updated_at": "2026-04-26T10:30:00-04:00",
+      "location": {"name": "Atlanta, GA"},
+      "content": "%3Cp%3ELead infrastructure.%3C%2Fp%3E",
+      "metadata": null
+    }
+  ],
+  "meta": {"total": 3}
+}
