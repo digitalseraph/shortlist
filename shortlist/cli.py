@@ -478,6 +478,36 @@ def contacts_remove(contact_id: int = typer.Argument(...)) -> None:
     console.print(f"[green]removed[/green] contact {contact_id}")
 
 
+# --- sources subgroup -----------------------------------------------------
+
+sources_app = typer.Typer(help="Manage source cooldown state.")
+app.add_typer(sources_app, name="sources")
+
+
+@sources_app.command("clear-cooldown")
+def sources_clear_cooldown(name: str = typer.Argument(...)) -> None:
+    """Clear the cooldown timestamp for a source."""
+    store_db.clear_source_cooldown(paths.db_path(), name)
+    console.print(f"[green]cleared[/green] cooldown for {name}")
+
+
+@sources_app.command("status")
+def sources_status() -> None:
+    """Print fetch + cooldown state for every source."""
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Source")
+    table.add_column("Last fetched")
+    table.add_column("Cooldown until")
+    table.add_column("Last error")
+    with store_db.connect(paths.db_path()) as conn:
+        rows = conn.execute(
+            "SELECT name, last_fetched_at, cooldown_until, last_error FROM sources ORDER BY name"
+        ).fetchall()
+    for r in rows:
+        table.add_row(r[0], r[1] or "—", r[2] or "—", r[3] or "—")
+    console.print(table)
+
+
 # --- tui ------------------------------------------------------------------
 
 

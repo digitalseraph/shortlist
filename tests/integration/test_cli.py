@@ -475,3 +475,20 @@ def test_fetch_skips_source_in_cooldown(env, monkeypatch):
         or "cooled" in result.output.lower()
         or "skipping" in result.output.lower()
     )
+
+
+def test_sources_clear_cooldown_cli(env):
+    cfg, data = env
+    runner.invoke(app, ["db", "init"])
+    from datetime import UTC, datetime, timedelta
+
+    from shortlist.store.db import is_source_in_cooldown, mark_source_cooldown
+
+    mark_source_cooldown(
+        data / "db.sqlite", "indeed", until=datetime.now(UTC) + timedelta(hours=24)
+    )
+    assert is_source_in_cooldown(data / "db.sqlite", "indeed") is True
+
+    result = runner.invoke(app, ["sources", "clear-cooldown", "indeed"])
+    assert result.exit_code == 0
+    assert is_source_in_cooldown(data / "db.sqlite", "indeed") is False
