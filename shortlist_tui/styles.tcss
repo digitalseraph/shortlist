@@ -1,15 +1,45 @@
-.kanban-col {
-    width: 1fr;
-    min-width: 20;
-    border: round $primary;
-    padding: 1;
+Screen {
+    background: $surface;
+}
+
+#hint {
+    background: $boost;
+    color: $text;
+    padding: 0 1;
+    height: 1;
+}
+
+#search {
+    margin: 0 1;
+    height: 3;
+}
+
+DataTable {
+    height: 1fr;
 }
 
 #board {
     height: 1fr;
 }
 
-#hint {
-    background: $boost;
+.kanban-col {
+    width: 1fr;
+    min-width: 20;
+    border: round $primary;
+    padding: 1;
+    margin: 0 1;
+}
+
+#title {
+    text-style: bold;
+    padding: 1;
+}
+
+#meta {
+    color: $text-muted;
     padding: 0 1;
+}
+
+Markdown {
+    margin: 1;
 }
