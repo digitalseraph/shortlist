@@ -1,0 +1,26 @@
+[
+  {
+    "id": "lev_001",
+    "text": "Senior Backend Engineer",
+    "hostedUrl": "https://jobs.lever.co/acme/lev_001",
+    "categories": {
+      "team": "Platform",
+      "location": "Remote - US",
+      "commitment": "Full-time"
+    },
+    "descriptionPlain": "Build distributed services in Python.",
+    "createdAt": 1745580000000
+  },
+  {
+    "id": "lev_002",
+    "text": "Staff Site Reliability Engineer",
+    "hostedUrl": "https://jobs.lever.co/acme/lev_002",
+    "categories": {
+      "team": "Infrastructure",
+      "location": "Atlanta, GA",
+      "commitment": "Full-time"
+    },
+    "descriptionPlain": "Run multi-region Kubernetes.",
+    "createdAt": 1745666400000
+  }
+]
