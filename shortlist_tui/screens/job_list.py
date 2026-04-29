@@ -7,7 +7,7 @@ from pathlib import Path
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Static
+from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from shortlist_tui.data import JobRow, list_job_rows
 
@@ -22,6 +22,8 @@ class JobListScreen(Screen[None]):
         Binding("G", "cursor_bottom", "Bottom", show=False),
         Binding("r", "refresh", "Refresh"),
         Binding("t", "tailor", "Tailor"),
+        Binding("slash", "focus_search", "Search"),
+        Binding("escape", "clear_search", "Clear", show=False),
     ]
 
     def __init__(self, db_path: Path) -> None:
@@ -31,7 +33,8 @@ class JobListScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static("Jobs (j/k navigate, enter=open, r=refresh, q=quit)", id="hint")
+        yield Static("Jobs (j/k navigate, enter=open, t=tailor, /=search, q=quit)", id="hint")
+        yield Input(placeholder="filter by company or title…", id="search")
         yield DataTable(id="jobs", cursor_type="row")
         yield Footer()
 
@@ -39,6 +42,7 @@ class JobListScreen(Screen[None]):
         table = self.query_one(DataTable)
         table.add_columns("Score", "Company", "Title", "Location", "Status")
         self._reload()
+        table.focus()
 
     def _reload(self) -> None:
         self._rows = list_job_rows(self._db)
@@ -72,6 +76,32 @@ class JobListScreen(Screen[None]):
 
     def action_refresh(self) -> None:
         self._reload()
+
+    def action_focus_search(self) -> None:
+        self.query_one(Input).focus()
+
+    def action_clear_search(self) -> None:
+        inp = self.query_one(Input)
+        inp.value = ""
+        self._reload()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        self._render_filtered(event.value.lower().strip())
+
+    def _render_filtered(self, q: str) -> None:
+        table = self.query_one(DataTable)
+        table.clear()
+        for r in self._rows:
+            if q and q not in r.company.lower() and q not in r.title.lower():
+                continue
+            table.add_row(
+                r.score_display,
+                r.company,
+                r.title,
+                r.location,
+                r.status_display,
+                key=str(r.id),
+            )
 
     def action_select_job(self) -> None:
         table = self.query_one(DataTable)

@@ -80,3 +80,51 @@ async def test_enter_opens_job_detail(tmp_path: Path) -> None:
         title = str(widget.render())
         assert "Senior Backend Engineer" in title
         assert "Acme" in title
+
+
+@pytest.mark.asyncio
+async def test_search_filters_table(tmp_path: Path):
+    db = tmp_path / "db.sqlite"
+    migrate(db)
+    upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="a",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/a",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+        ),
+    )
+    upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="b",
+            company="Globex",
+            title="Frontend Engineer",
+            url="https://example.com/b",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+        ),
+    )
+
+    from textual.widgets import DataTable
+
+    async with ShortlistApp(db_path=db).run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("slash")
+        await pilot.pause()
+        for ch in "globex":
+            await pilot.press(ch)
+        await pilot.pause()
+        # Inspect the DataTable rows directly (Textual 8 quirk).
+        table = pilot.app.screen.query_one(DataTable)
+        assert table.row_count == 1
+        # Cell at row 0, column 1 (Company)
+        company_cell = table.get_cell_at((0, 1))
+        assert "Globex" in str(company_cell)
