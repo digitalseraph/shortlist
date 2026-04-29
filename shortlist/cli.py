@@ -4,7 +4,7 @@ Subcommand groups:
   config  — view config + write defaults
   db      — init / status / backup
   fetch   — pull jobs from enabled sources
-  rank    — apply hard filter (Plan 1) / LLM rerank (Plan 2)
+  rank    — hard filter → cosine top-K → Haiku rerank
   list    — print stored jobs
 """
 
@@ -207,38 +207,63 @@ def fetch() -> None:
 
 # --- rank -----------------------------------------------------------------
 
-from shortlist.ranker.hard_filter import passes  # noqa: E402
+from shortlist.config import load_config  # noqa: E402
+from shortlist.ranker.embeddings import EmbeddingService  # noqa: E402
+from shortlist.ranker.llm_rerank import LLMReranker  # noqa: E402
+from shortlist.ranker.pipeline import run_pipeline  # noqa: E402
 
 
 @app.command("rank")
-def rank() -> None:
-    """Score stored jobs.
-
-    Plan 1: hard filter only. Passes -> score 50, fails -> score 0.
-    Plan 2 will replace this with embeddings + Haiku rerank.
-    """
-    if not paths.prefs_path().exists():
+def rank(
+    top_k: int = typer.Option(30, "--top-k", help="Cosine pre-rank size."),
+    no_llm: bool = typer.Option(False, "--no-llm", help="Skip Haiku rerank ($0)."),
+) -> None:
+    """Score stored jobs: hard filter → cosine top-K → Haiku rerank."""
+    if not paths.prefs_path().exists() or not paths.config_path().exists():
         console.print("[red]error[/red] run `shortlist config init` first")
         raise typer.Exit(code=2)
     if not paths.db_path().exists():
         console.print("[red]error[/red] run `shortlist db init` first")
         raise typer.Exit(code=2)
 
+    cfg = load_config(paths.config_path())
     prefs = load_prefs(paths.prefs_path())
-    db = paths.db_path()
-    pass_count = fail_count = 0
+    resume = cfg.paths.resume.expanduser()
+    if not resume.exists():
+        console.print(f"[red]error[/red] resume not found at {resume}")
+        raise typer.Exit(code=2)
 
-    for job in store_db.list_jobs(db):
-        if passes(job, prefs):
-            store_db.update_score(
-                db, job.id, score=50, reason="passed hard filter", model="hard_filter"
+    embedder = EmbeddingService(model_name=cfg.ranker.embedding_model)
+
+    reranker: LLMReranker | None = None
+    if not no_llm:
+        import os
+
+        key = os.environ.get(cfg.anthropic.key_env_var, "")
+        if not key:
+            console.print(
+                f"[yellow]{cfg.anthropic.key_env_var} not set — running with --no-llm[/yellow]"
             )
-            pass_count += 1
         else:
-            store_db.update_score(db, job.id, score=0, reason="filtered out", model="hard_filter")
-            fail_count += 1
+            from anthropic import Anthropic
 
-    console.print(f"ranked: {pass_count} pass / {fail_count} filtered")
+            reranker = LLMReranker(
+                client=Anthropic(api_key=key),
+                model=cfg.ranker.rerank_model,
+            )
+
+    summary = run_pipeline(
+        paths.db_path(),
+        prefs=prefs,
+        resume_path=resume,
+        embedder=embedder,
+        reranker=reranker,
+        top_k=top_k,
+    )
+    console.print(
+        f"ranked: filtered={summary.filtered}, cosine_top_k={summary.cosine_top_k}, "
+        f"llm_scored={summary.llm_scored}, cost=${summary.cost_usd:.4f}"
+    )
 
 
 # --- list -----------------------------------------------------------------

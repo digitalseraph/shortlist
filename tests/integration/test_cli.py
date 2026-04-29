@@ -145,7 +145,7 @@ def test_fetch_handles_source_error_gracefully(env):
 
 
 @respx.mock
-def test_rank_scores_passing_jobs_high_failing_low(env):
+def test_rank_no_llm_runs_pipeline(env, tmp_path, monkeypatch):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     (cfg / "prefs.yaml").write_text(
@@ -156,8 +156,31 @@ def test_rank_scores_passing_jobs_high_failing_low(env):
             "greenhouse_companies:\n  - acme",
         )
     )
-    runner.invoke(app, ["db", "init"])
+    resume = tmp_path / "resume.md"
+    resume.write_text("Senior backend engineer with Python.")
+    cfg_text = (
+        (cfg / "config.yaml").read_text().replace("resume: ~/jobs/resume.md", f"resume: {resume}")
+    )
+    (cfg / "config.yaml").write_text(cfg_text)
 
+    from unittest.mock import MagicMock
+
+    import numpy as np
+
+    fake = MagicMock()
+
+    def _enc(t, **_):
+        rng = np.random.default_rng(sum(ord(c) for c in (t if isinstance(t, str) else t[0])))
+        v = rng.standard_normal(384).astype("float32")
+        return v / np.linalg.norm(v)
+
+    fake.encode = _enc
+
+    import shortlist.ranker.embeddings as emb
+
+    monkeypatch.setattr(emb, "_load_model", lambda *_a, **_k: fake)
+
+    runner.invoke(app, ["db", "init"])
     payload = json.loads((FIXTURES / "greenhouse_acme_page1.json").read_text())
     respx.get(
         "https://boards-api.greenhouse.io/v1/boards/acme/jobs",
@@ -165,21 +188,14 @@ def test_rank_scores_passing_jobs_high_failing_low(env):
     ).mock(return_value=httpx.Response(200, json=payload))
     runner.invoke(app, ["fetch"])
 
-    result = runner.invoke(app, ["rank"])
+    result = runner.invoke(app, ["rank", "--no-llm"])
     assert result.exit_code == 0, result.output
-
-    # Two seeded jobs: "Senior Backend Engineer" (passes) and
-    # "Staff Platform Engineer" (passes via "staff" seniority).
-    # Both pass hard filter -> score 50 (placeholder for Plan 1).
-    from shortlist.store.db import list_jobs
-
-    jobs = list_jobs(data / "db.sqlite")
-    scores = sorted(j.score for j in jobs if j.score is not None)
-    assert scores == [50, 50]
+    assert "filtered=" in result.output
+    assert "cost=$0.0000" in result.output
 
 
 @respx.mock
-def test_list_shows_top_jobs(env):
+def test_list_shows_top_jobs(env, tmp_path, monkeypatch):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     (cfg / "prefs.yaml").write_text(
@@ -190,6 +206,29 @@ def test_list_shows_top_jobs(env):
             "greenhouse_companies:\n  - acme",
         )
     )
+    resume = tmp_path / "resume.md"
+    resume.write_text("Senior backend engineer with Python.")
+    (cfg / "config.yaml").write_text(
+        (cfg / "config.yaml").read_text().replace("resume: ~/jobs/resume.md", f"resume: {resume}")
+    )
+
+    from unittest.mock import MagicMock
+
+    import numpy as np
+
+    fake = MagicMock()
+
+    def _enc(t, **_):
+        rng = np.random.default_rng(sum(ord(c) for c in (t if isinstance(t, str) else t[0])))
+        v = rng.standard_normal(384).astype("float32")
+        return v / np.linalg.norm(v)
+
+    fake.encode = _enc
+
+    import shortlist.ranker.embeddings as emb
+
+    monkeypatch.setattr(emb, "_load_model", lambda *_a, **_k: fake)
+
     runner.invoke(app, ["db", "init"])
     payload = json.loads((FIXTURES / "greenhouse_acme_page1.json").read_text())
     respx.get(
@@ -197,7 +236,7 @@ def test_list_shows_top_jobs(env):
         params={"content": "true"},
     ).mock(return_value=httpx.Response(200, json=payload))
     runner.invoke(app, ["fetch"])
-    runner.invoke(app, ["rank"])
+    runner.invoke(app, ["rank", "--no-llm"])
 
     result = runner.invoke(app, ["list"])
     assert result.exit_code == 0
