@@ -436,3 +436,37 @@ def log_event(
             "VALUES (?, ?, ?, ?, ?, ?)",
             (job_id, type, json.dumps(payload or {}), cost_usd, tokens, _utc_iso(when)),
         )
+
+
+# ---------------------------------------------------------------------------
+# Cooldown helpers
+# ---------------------------------------------------------------------------
+
+
+def mark_source_cooldown(path: Path, name: str, *, until: datetime) -> None:
+    """Set the cooldown_until timestamp for a source."""
+    with connect(path) as conn:
+        conn.execute(
+            """
+            INSERT INTO sources (name, cooldown_until) VALUES (?, ?)
+            ON CONFLICT (name) DO UPDATE SET cooldown_until = excluded.cooldown_until
+            """,
+            (name, _utc_iso(until)),
+        )
+
+
+def is_source_in_cooldown(path: Path, name: str, *, now: datetime | None = None) -> bool:
+    """Return True if the source is currently cooled down."""
+    now = now or datetime.now(UTC)
+    with connect(path) as conn:
+        row = conn.execute("SELECT cooldown_until FROM sources WHERE name = ?", (name,)).fetchone()
+    if row is None or row[0] is None:
+        return False
+    until = datetime.fromisoformat(row[0].replace("Z", "+00:00"))
+    return now < until
+
+
+def clear_source_cooldown(path: Path, name: str) -> None:
+    """Reset cooldown_until for a source."""
+    with connect(path) as conn:
+        conn.execute("UPDATE sources SET cooldown_until = NULL WHERE name = ?", (name,))

@@ -71,6 +71,9 @@ class Prefs(BaseModel):
     ashby_companies: list[str] = Field(default_factory=list)
     workable_companies: list[str] = Field(default_factory=list)
     smartrecruiters_companies: list[str] = Field(default_factory=list)
+    indeed_queries: list[str] = Field(default_factory=list)
+    linkedin_queries: list[str] = Field(default_factory=list)
+    glassdoor_queries: list[str] = Field(default_factory=list)
 
     @field_validator(
         "titles",
@@ -82,6 +85,9 @@ class Prefs(BaseModel):
         "ashby_companies",
         "workable_companies",
         "smartrecruiters_companies",
+        "indeed_queries",
+        "linkedin_queries",
+        "glassdoor_queries",
     )
     @classmethod
     def _strip(cls, v: list[str]) -> list[str]:

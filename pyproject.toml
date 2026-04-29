@@ -19,6 +19,8 @@ dependencies = [
     "anthropic>=0.40",
     "numpy>=1.26",
     "textual>=0.85",
+    "playwright>=1.45",
+    "beautifulsoup4>=4.12",
 ]
 
 [project.optional-dependencies]

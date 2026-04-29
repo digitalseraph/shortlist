@@ -80,3 +80,20 @@ def test_prefs_defaults_to_empty_lists_when_omitted():
     assert p.ashby_companies == []
     assert p.workable_companies == []
     assert p.smartrecruiters_companies == []
+
+
+def test_prefs_includes_scraped_queries():
+    p = Prefs.model_validate(
+        {
+            "titles": ["Eng"],
+            "locations": ["Remote"],
+            "remote_ok": True,
+            "comp_floor_usd": 100000,
+            "exclude_keywords": [],
+            "seniority": [],
+            "greenhouse_companies": [],
+        }
+    )
+    assert p.indeed_queries == []
+    assert p.linkedin_queries == []
+    assert p.glassdoor_queries == []
