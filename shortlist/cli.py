@@ -19,8 +19,13 @@ from rich.console import Console
 from rich.table import Table
 
 from shortlist import paths
-from shortlist.config import load_prefs
+from shortlist.config import Prefs, load_prefs
+from shortlist.sources.ats.ashby import AshbySource
 from shortlist.sources.ats.greenhouse import GreenhouseSource
+from shortlist.sources.ats.lever import LeverSource
+from shortlist.sources.ats.smartrecruiters import SmartRecruitersSource
+from shortlist.sources.ats.workable import WorkableSource
+from shortlist.sources.base import Source
 from shortlist.store import db as store_db
 
 app = typer.Typer(no_args_is_help=True, help="Shortlist — personal job search.")
@@ -155,9 +160,28 @@ def config_show() -> None:
 # --- fetch ----------------------------------------------------------------
 
 
+def _build_sources(prefs: Prefs) -> list[Source]:
+    sources: list[Source] = []
+    if prefs.greenhouse_companies:
+        sources.append(
+            GreenhouseSource(companies={t: t.title() for t in prefs.greenhouse_companies})
+        )
+    if prefs.lever_companies:
+        sources.append(LeverSource(companies={t: t.title() for t in prefs.lever_companies}))
+    if prefs.ashby_companies:
+        sources.append(AshbySource(companies={t: t.title() for t in prefs.ashby_companies}))
+    if prefs.workable_companies:
+        sources.append(WorkableSource(companies={t: t.title() for t in prefs.workable_companies}))
+    if prefs.smartrecruiters_companies:
+        sources.append(
+            SmartRecruitersSource(companies={t: t for t in prefs.smartrecruiters_companies})
+        )
+    return sources
+
+
 @app.command("fetch")
 def fetch() -> None:
-    """Pull jobs from enabled sources and persist."""
+    """Pull jobs from all enabled sources."""
     if not paths.prefs_path().exists():
         console.print("[red]error[/red] run `shortlist config init` first")
         raise typer.Exit(code=2)
@@ -169,17 +193,14 @@ def fetch() -> None:
     db = paths.db_path()
 
     total = 0
-    if prefs.greenhouse_companies:
-        # Without per-company display in prefs, use the token capitalised.
-        companies = {tok: tok.title() for tok in prefs.greenhouse_companies}
-        src = GreenhouseSource(companies=companies)
+    for src in _build_sources(prefs):
         try:
             for raw in src.fetch(since=store_db.source_last_fetched(db, src.name)):
                 store_db.upsert_job(db, raw)
                 total += 1
             store_db.mark_source_fetched(db, src.name, datetime.now(UTC))
         except Exception as e:  # noqa: BLE001 — surface and continue
-            console.print(f"[yellow]greenhouse error:[/yellow] {e}")
+            console.print(f"[yellow]{src.name} error:[/yellow] {e}")
 
     console.print(f"fetched {total} jobs")
 

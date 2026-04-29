@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import httpx
@@ -211,3 +212,46 @@ def test_list_min_score_filter(env):
     result = runner.invoke(app, ["list", "--min-score", "1"])
     # No jobs yet; exit 0, empty table.
     assert result.exit_code == 0
+
+
+@respx.mock
+def test_fetch_iterates_all_configured_sources(env):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    prefs_yaml = (cfg / "prefs.yaml").read_text()
+    prefs_yaml = (
+        prefs_yaml.replace(
+            "greenhouse_companies: []",
+            "greenhouse_companies:\n  - acme",
+        )
+        .replace(
+            "lever_companies: []",
+            "lever_companies:\n  - acme",
+        )
+        .replace(
+            "ashby_companies: []",
+            "ashby_companies:\n  - acme",
+        )
+    )
+    (cfg / "prefs.yaml").write_text(prefs_yaml)
+    runner.invoke(app, ["db", "init"])
+
+    gh = json.loads((FIXTURES / "greenhouse_acme_page1.json").read_text())
+    lever = json.loads((FIXTURES / "lever_acme.json").read_text())
+    ashby = json.loads((FIXTURES / "ashby_acme.json").read_text())
+    respx.get(
+        "https://boards-api.greenhouse.io/v1/boards/acme/jobs",
+        params={"content": "true"},
+    ).mock(return_value=httpx.Response(200, json=gh))
+    respx.get(
+        "https://api.lever.co/v0/postings/acme",
+        params={"mode": "json"},
+    ).mock(return_value=httpx.Response(200, json=lever))
+    respx.get(re.compile(r"^https://api\.ashbyhq\.com/posting-api/job-board/acme")).mock(
+        return_value=httpx.Response(200, json=ashby)
+    )
+
+    result = runner.invoke(app, ["fetch"])
+    assert result.exit_code == 0, result.output
+    # 2 GH + 2 Lever + 2 Ashby = 6
+    assert "fetched 6 jobs" in result.output.lower()
