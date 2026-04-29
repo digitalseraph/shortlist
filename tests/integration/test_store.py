@@ -165,3 +165,43 @@ def test_sqlite_vec_extension_loads(db_path: Path):
     with connect(db_path) as conn:
         row = conn.execute("SELECT vec_version()").fetchone()
     assert row is not None
+
+
+def test_upsert_embedding_round_trips(db_path: Path):
+    import numpy as np
+
+    from shortlist.store.db import get_embedding, upsert_embedding
+
+    migrate(db_path)
+    job = upsert_job(db_path, _raw())
+    vec = np.arange(384, dtype=np.float32) / 384.0
+    upsert_embedding(db_path, job.id, vec)
+    out = get_embedding(db_path, job.id)
+    assert out is not None
+    np.testing.assert_allclose(out, vec, atol=1e-6)
+
+
+def test_cosine_top_k_returns_ordered_job_ids(db_path: Path):
+    import numpy as np
+
+    from shortlist.store.db import cosine_top_k, upsert_embedding
+
+    migrate(db_path)
+    j1 = upsert_job(db_path, _raw("gh_1", title="Senior Backend Engineer"))
+    j2 = upsert_job(db_path, _raw("gh_2", title="Frontend Engineer"))
+    j3 = upsert_job(db_path, _raw("gh_3", title="ML Engineer"))
+
+    rng = np.random.default_rng(0)
+    target = rng.standard_normal(384).astype("float32")
+    target /= np.linalg.norm(target)
+
+    near = target + rng.standard_normal(384).astype("float32") * 0.01
+    near /= np.linalg.norm(near)
+    far = -target
+
+    upsert_embedding(db_path, j1.id, near)
+    upsert_embedding(db_path, j2.id, target)
+    upsert_embedding(db_path, j3.id, far)
+
+    top = cosine_top_k(db_path, target, k=2)
+    assert [j for (j, _d) in top] == [j2.id, j1.id]

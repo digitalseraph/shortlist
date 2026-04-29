@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import sqlite_vec  # type: ignore[import-untyped]
 
 from shortlist.models import Job, JobStatus, RawJob
@@ -234,3 +235,56 @@ def source_last_fetched(path: Path, name: str) -> datetime | None:
     if row is None or row[0] is None:
         return None
     return datetime.fromisoformat(row[0].replace("Z", "+00:00"))
+
+
+# ---------------------------------------------------------------------------
+# Embedding helpers
+# ---------------------------------------------------------------------------
+
+
+def upsert_embedding(path: Path, job_id: int, vec: np.ndarray) -> None:
+    """Store a 384-dim float32 embedding for a job, replacing any prior value."""
+    if vec.dtype != np.float32:
+        vec = vec.astype(np.float32)
+    if vec.shape != (384,):
+        raise ValueError(f"expected (384,) vector, got {vec.shape}")
+    with connect(path) as conn:
+        conn.execute("DELETE FROM job_embeddings WHERE job_id = ?", (job_id,))
+        conn.execute(
+            "INSERT INTO job_embeddings (job_id, embedding) VALUES (?, ?)",
+            (job_id, vec.tobytes()),
+        )
+
+
+def get_embedding(path: Path, job_id: int) -> np.ndarray | None:
+    """Return the stored embedding for a job, or None if not found."""
+    with connect(path) as conn:
+        row = conn.execute(
+            "SELECT embedding FROM job_embeddings WHERE job_id = ?", (job_id,)
+        ).fetchone()
+    if row is None:
+        return None
+    return np.frombuffer(row[0], dtype=np.float32).copy()
+
+
+def cosine_top_k(path: Path, query: np.ndarray, *, k: int = 30) -> list[tuple[int, float]]:
+    """Return up to k (job_id, distance) ordered by ascending vec0 distance.
+
+    sqlite-vec uses L2 by default; on normalized vectors L2-rank == cosine-rank,
+    so callers should normalize vectors at encode time.
+    """
+    if query.dtype != np.float32:
+        query = query.astype(np.float32)
+    with connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT job_id, distance
+            FROM job_embeddings
+            WHERE embedding MATCH ?
+            ORDER BY distance
+            LIMIT ?
+            """,
+            (query.tobytes(), int(k)),
+        ).fetchall()
+    return [(int(r["job_id"]), float(r["distance"])) for r in rows]
