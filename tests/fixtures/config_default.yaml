@@ -1,0 +1,20 @@
+anthropic:
+  key_source: env
+  key_env_var: ANTHROPIC_API_KEY
+budget:
+  daily_usd: 5.00
+  monthly_usd: 60.00
+paths:
+  resume: ~/jobs/resume.md
+  output_dir: ~/jobs
+sources:
+  greenhouse:
+    enabled: true
+    rate_limit_rpm: 30
+ranker:
+  top_k_for_llm_rerank: 30
+  embedding_model: bge-small-en-v1.5
+  rerank_model: claude-haiku-4-5-20251001
+tailor:
+  model: claude-sonnet-4-6
+  cover_paragraphs: 3

@@ -1,0 +1,17 @@
+titles:
+  - "Senior Backend Engineer"
+  - "Staff Engineer"
+locations:
+  - "Remote - US"
+  - "Atlanta, GA"
+remote_ok: true
+comp_floor_usd: 180000
+exclude_keywords:
+  - "C++"
+  - "on-site only"
+seniority:
+  - senior
+  - staff
+greenhouse_companies:
+  - acme
+  - globex
