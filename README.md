@@ -2,11 +2,11 @@
 
 Personal job-search assistant. Discovers postings, ranks them against your resume + preferences, tailors per-job materials, and tracks the application lifecycle. **You apply manually** — Shortlist surfaces and prepares; it never auto-submits.
 
-This is **Plan 2 of 6** (ATS expansion + LLM rerank). Cumulative status:
+This is **Plan 3 of 6** (tailoring + tracker). Cumulative status:
 
 - ✅ Plan 1 (foundation): Greenhouse + SQLite + hard filter + CLI
-- ✅ Plan 2 (this): Lever, Ashby, Workable, SmartRecruiters; embeddings via `sentence-transformers`; Haiku 4.5 rerank with budget guard
-- ⏳ Plan 3: tailoring (resume + cover + notes via Sonnet 4.6) + status tracker
+- ✅ Plan 2: Lever, Ashby, Workable, SmartRecruiters; embeddings via `sentence-transformers`; Haiku 4.5 rerank with budget guard
+- ✅ Plan 3 (this): Sonnet 4.6 per-job tailoring (resume + cover + notes); pandoc → PDF; status state machine; contacts CRUD
 - ⏳ Plan 4: Textual TUI
 - ⏳ Plan 5: scraped aggregators (Indeed, LinkedIn, Glassdoor) + Playwright
 - ⏳ Plan 6: curated boards (HN/Wellfound/Otta/RemoteOK) + RSS + release polish
@@ -30,7 +30,21 @@ shortlist fetch                   # pull jobs for configured ATS companies
 shortlist rank --no-llm           # cheap mode: hard filter + cosine pre-rank
 shortlist rank                    # full pipeline (requires ANTHROPIC_API_KEY)
 shortlist list                    # see what survived, sorted by score
+shortlist tailor <job_id>         # generate per-job MD + PDF
+shortlist track <job_id> --status tailored
+shortlist track <job_id> --status applied --applied-via "company website"
+shortlist contacts add <job_id> --name "Jane Doe" --email jane@acme.com --role recruiter
+shortlist contacts list <job_id>
 ```
+
+## System dependencies
+
+For PDF rendering, `pandoc` and `pdflatex` (TeX Live, including LaTeX format files) must be on PATH:
+
+- Arch / CachyOS: `sudo pacman -S pandoc texlive-core texlive-latex`
+- macOS: `brew install pandoc basictex`
+
+Without them, `shortlist tailor` still writes Markdown — only the PDF render step is skipped (with a warning).
 
 ## Design
 
