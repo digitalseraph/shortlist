@@ -1,9 +1,11 @@
+from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
 
 from shortlist.models import Job, RawJob
+from shortlist.sources.base import Source
 
 
 def test_rawjob_minimum_fields():
@@ -60,3 +62,30 @@ def test_job_score_bounds():
             discovered_at=datetime.now(UTC),
             score=101,
         )
+
+
+def test_source_abc_requires_fetch():
+    class Bad(Source):
+        name = "bad"
+
+    with pytest.raises(TypeError):
+        Bad()  # abstract method not implemented
+
+
+def test_concrete_source_fetch_yields_rawjob():
+    class Fake(Source):
+        name = "fake"
+
+        def fetch(self, since: datetime | None) -> Iterator[RawJob]:
+            yield RawJob(
+                source="fake",
+                external_id="x_1",
+                company="Acme",
+                title="Eng",
+                url="https://example.com",
+                posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            )
+
+    out = list(Fake().fetch(None))
+    assert len(out) == 1
+    assert out[0].source == "fake"
