@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import shutil
 from datetime import UTC, datetime
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -63,3 +64,82 @@ def db_backup() -> None:
     dst = backup_dir / f"db-{stamp}.sqlite"
     shutil.copy2(src, dst)
     console.print(f"[green]ok[/green] backup at {dst}")
+
+
+# --- config subgroup ------------------------------------------------------
+
+config_app = typer.Typer(help="Manage configuration.")
+app.add_typer(config_app, name="config")
+
+
+_DEFAULT_CONFIG = """\
+# Shortlist configuration. See docs/spec.md for the full reference.
+anthropic:
+  key_source: env
+  key_env_var: ANTHROPIC_API_KEY
+budget:
+  daily_usd: 5.00
+  monthly_usd: 60.00
+paths:
+  resume: ~/jobs/resume.md
+  output_dir: ~/jobs
+sources:
+  greenhouse:
+    enabled: true
+    rate_limit_rpm: 30
+ranker:
+  top_k_for_llm_rerank: 30
+  embedding_model: bge-small-en-v1.5
+  rerank_model: claude-haiku-4-5-20251001
+tailor:
+  model: claude-sonnet-4-6
+  cover_paragraphs: 3
+"""
+
+_DEFAULT_PREFS = """\
+# Shortlist preferences. Edit these to taste.
+titles:
+  - "Senior Backend Engineer"
+  - "Staff Engineer"
+locations:
+  - "Remote - US"
+  - "Atlanta, GA"
+remote_ok: true
+comp_floor_usd: 180000
+exclude_keywords: []
+seniority:
+  - senior
+  - staff
+greenhouse_companies: []
+"""
+
+
+@config_app.command("init")
+def config_init() -> None:
+    """Write default config.yaml and prefs.yaml if not present."""
+    paths.config_dir().mkdir(parents=True, exist_ok=True)
+    cfg_path = paths.config_path()
+    prefs_path = paths.prefs_path()
+    wrote: list[Path] = []
+    if not cfg_path.exists():
+        cfg_path.write_text(_DEFAULT_CONFIG)
+        wrote.append(cfg_path)
+    if not prefs_path.exists():
+        prefs_path.write_text(_DEFAULT_PREFS)
+        wrote.append(prefs_path)
+    if wrote:
+        for p in wrote:
+            console.print(f"[green]wrote[/green] {p}")
+    else:
+        console.print("[yellow]no changes — both files exist[/yellow]")
+
+
+@config_app.command("show")
+def config_show() -> None:
+    """Print current config.yaml + prefs.yaml."""
+    for p in (paths.config_path(), paths.prefs_path()):
+        if not p.exists():
+            console.print(f"[yellow]missing[/yellow] {p}")
+            continue
+        console.rule(str(p))
+        console.print(p.read_text())

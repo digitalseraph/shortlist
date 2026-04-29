@@ -57,3 +57,27 @@ def test_db_backup_creates_file(env):
 def test_db_backup_errors_when_no_db(env):
     result = runner.invoke(app, ["db", "backup"])
     assert result.exit_code == 1
+
+
+def test_config_init_writes_default_files(env):
+    cfg, data = env
+    result = runner.invoke(app, ["config", "init"])
+    assert result.exit_code == 0, result.output
+    assert (cfg / "config.yaml").exists()
+    assert (cfg / "prefs.yaml").exists()
+
+
+def test_config_init_does_not_overwrite(env):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    (cfg / "config.yaml").write_text("# user-edited\n")
+    result = runner.invoke(app, ["config", "init"])
+    assert result.exit_code == 0
+    assert "# user-edited" in (cfg / "config.yaml").read_text()
+
+
+def test_config_show_after_init(env):
+    runner.invoke(app, ["config", "init"])
+    result = runner.invoke(app, ["config", "show"])
+    assert result.exit_code == 0
+    assert "anthropic:" in result.output
