@@ -1,0 +1,35 @@
+{
+  "name": "Acme Corp",
+  "jobs": [
+    {
+      "shortcode": "WRK001",
+      "title": "Senior Backend Engineer",
+      "full_title": "Senior Backend Engineer",
+      "location": {
+        "city": "Remote",
+        "country": "United States",
+        "region": null,
+        "location_str": "Remote, United States"
+      },
+      "application_url": "https://apply.workable.com/acme/j/WRK001/",
+      "description": "<p>Build services in Python.</p>",
+      "requirements": "<p>5+ years backend.</p>",
+      "posted_date": "2026-04-25"
+    },
+    {
+      "shortcode": "WRK002",
+      "title": "Staff Engineer",
+      "full_title": "Staff Engineer",
+      "location": {
+        "city": "Atlanta",
+        "country": "United States",
+        "region": "GA",
+        "location_str": "Atlanta, GA, United States"
+      },
+      "application_url": "https://apply.workable.com/acme/j/WRK002/",
+      "description": "<p>Architecture leadership.</p>",
+      "requirements": null,
+      "posted_date": "2026-04-26"
+    }
+  ]
+}
