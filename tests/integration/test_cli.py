@@ -1,11 +1,16 @@
+import json
 from pathlib import Path
 
+import httpx
 import pytest
+import respx
 from typer.testing import CliRunner
 
 from shortlist.cli import app
 
 runner = CliRunner()
+
+FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 @pytest.fixture
@@ -81,3 +86,58 @@ def test_config_show_after_init(env):
     result = runner.invoke(app, ["config", "show"])
     assert result.exit_code == 0
     assert "anthropic:" in result.output
+
+
+@respx.mock
+def test_fetch_persists_jobs(env):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    prefs_yaml = (
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
+            "greenhouse_companies: []",
+            "greenhouse_companies:\n  - acme",
+        )
+    )
+    (cfg / "prefs.yaml").write_text(prefs_yaml)
+    runner.invoke(app, ["db", "init"])
+
+    payload = json.loads((FIXTURES / "greenhouse_acme_page1.json").read_text())
+    respx.get(
+        "https://boards-api.greenhouse.io/v1/boards/acme/jobs",
+        params={"content": "true"},
+    ).mock(return_value=httpx.Response(200, json=payload))
+
+    result = runner.invoke(app, ["fetch"])
+    assert result.exit_code == 0, result.output
+    assert "fetched 2 jobs" in result.output.lower()
+
+    # Re-fetch is idempotent.
+    result = runner.invoke(app, ["fetch"])
+    assert result.exit_code == 0
+
+
+@respx.mock
+def test_fetch_handles_source_error_gracefully(env):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    (cfg / "prefs.yaml").write_text(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
+            "greenhouse_companies: []",
+            "greenhouse_companies:\n  - nopecorp",
+        )
+    )
+    runner.invoke(app, ["db", "init"])
+
+    respx.get(
+        "https://boards-api.greenhouse.io/v1/boards/nopecorp/jobs",
+        params={"content": "true"},
+    ).mock(return_value=httpx.Response(500))
+
+    result = runner.invoke(app, ["fetch"])
+    # Source error must not crash the CLI.
+    assert result.exit_code == 0
+    assert "0 jobs" in result.output.lower() or "error" in result.output.lower()

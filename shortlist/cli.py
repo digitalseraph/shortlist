@@ -18,6 +18,8 @@ import typer
 from rich.console import Console
 
 from shortlist import paths
+from shortlist.config import load_prefs
+from shortlist.sources.ats.greenhouse import GreenhouseSource
 from shortlist.store import db as store_db
 
 app = typer.Typer(no_args_is_help=True, help="Shortlist — personal job search.")
@@ -143,3 +145,35 @@ def config_show() -> None:
             continue
         console.rule(str(p))
         console.print(p.read_text())
+
+
+# --- fetch ----------------------------------------------------------------
+
+
+@app.command("fetch")
+def fetch() -> None:
+    """Pull jobs from enabled sources and persist."""
+    if not paths.prefs_path().exists():
+        console.print("[red]error[/red] run `shortlist config init` first")
+        raise typer.Exit(code=2)
+    if not paths.db_path().exists():
+        console.print("[red]error[/red] run `shortlist db init` first")
+        raise typer.Exit(code=2)
+
+    prefs = load_prefs(paths.prefs_path())
+    db = paths.db_path()
+
+    total = 0
+    if prefs.greenhouse_companies:
+        # Without per-company display in prefs, use the token capitalised.
+        companies = {tok: tok.title() for tok in prefs.greenhouse_companies}
+        src = GreenhouseSource(companies=companies)
+        try:
+            for raw in src.fetch(since=store_db.source_last_fetched(db, src.name)):
+                store_db.upsert_job(db, raw)
+                total += 1
+            store_db.mark_source_fetched(db, src.name, datetime.now(UTC))
+        except Exception as e:  # noqa: BLE001 — surface and continue
+            console.print(f"[yellow]greenhouse error:[/yellow] {e}")
+
+    console.print(f"fetched {total} jobs")
