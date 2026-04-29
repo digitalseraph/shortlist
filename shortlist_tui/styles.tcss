@@ -1,0 +1,15 @@
+.kanban-col {
+    width: 1fr;
+    min-width: 20;
+    border: round $primary;
+    padding: 1;
+}
+
+#board {
+    height: 1fr;
+}
+
+#hint {
+    background: $boost;
+    padding: 0 1;
+}

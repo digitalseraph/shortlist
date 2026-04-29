@@ -13,7 +13,11 @@ from shortlist_tui.screens.job_list import JobListScreen
 class ShortlistApp(App[None]):
     TITLE = "Shortlist"
     SUB_TITLE = "Personal job-search assistant"
-    BINDINGS = [("q", "quit", "Quit")]
+    CSS_PATH = "styles.tcss"
+    BINDINGS = [
+        ("q", "quit", "Quit"),
+        ("a", "push_applications", "Applications"),
+    ]
 
     def __init__(self, db_path: Path | None = None) -> None:
         super().__init__()
@@ -21,6 +25,11 @@ class ShortlistApp(App[None]):
 
     def on_mount(self) -> None:
         self.push_screen(JobListScreen(self._db_path))
+
+    def action_push_applications(self) -> None:
+        from shortlist_tui.screens.applications import ApplicationsBoardScreen
+
+        self.push_screen(ApplicationsBoardScreen(self._db_path))
 
 
 def run_tui(db_path: Path | None = None) -> None:
