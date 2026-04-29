@@ -74,6 +74,11 @@ class Prefs(BaseModel):
     indeed_queries: list[str] = Field(default_factory=list)
     linkedin_queries: list[str] = Field(default_factory=list)
     glassdoor_queries: list[str] = Field(default_factory=list)
+    hn_enabled: bool = False
+    remoteok_enabled: bool = False
+    wellfound_queries: list[str] = Field(default_factory=list)
+    otta_queries: list[str] = Field(default_factory=list)
+    rss_urls: list[str] = Field(default_factory=list)
 
     @field_validator(
         "titles",
@@ -88,6 +93,9 @@ class Prefs(BaseModel):
         "indeed_queries",
         "linkedin_queries",
         "glassdoor_queries",
+        "wellfound_queries",
+        "otta_queries",
+        "rss_urls",
     )
     @classmethod
     def _strip(cls, v: list[str]) -> list[str]:

@@ -492,3 +492,34 @@ def test_sources_clear_cooldown_cli(env):
     result = runner.invoke(app, ["sources", "clear-cooldown", "indeed"])
     assert result.exit_code == 0
     assert is_source_in_cooldown(data / "db.sqlite", "indeed") is False
+
+
+def test_fetch_with_curated_sources_runs_no_errors(env, monkeypatch):
+    """Smoke: enabling HN + RemoteOK + RSS doesn't crash fetch (mocked)."""
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    prefs_yaml = (
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace("hn_enabled: false", "hn_enabled: true")
+        .replace("remoteok_enabled: false", "remoteok_enabled: true")
+        .replace("rss_urls: []", "rss_urls:\n  - https://example.invalid/feed.rss")
+    )
+    (cfg / "prefs.yaml").write_text(prefs_yaml)
+    runner.invoke(app, ["db", "init"])
+
+    class _Stub:
+        def __init__(self, name):
+            self.name = name
+
+        def fetch(self, since=None):
+            return iter([])
+
+    import shortlist.cli as cli_mod
+
+    monkeypatch.setattr(cli_mod, "HNWhoHiringSource", lambda: _Stub("hn_who_hiring"))
+    monkeypatch.setattr(cli_mod, "RemoteOKSource", lambda: _Stub("remoteok"))
+    monkeypatch.setattr(cli_mod, "RSSSource", lambda urls: _Stub("rss"))
+
+    result = runner.invoke(app, ["fetch"])
+    assert result.exit_code == 0, result.output

@@ -27,9 +27,14 @@ from shortlist.sources.ats.lever import LeverSource
 from shortlist.sources.ats.smartrecruiters import SmartRecruitersSource
 from shortlist.sources.ats.workable import WorkableSource
 from shortlist.sources.base import Source
+from shortlist.sources.curated.hn_who_hiring import HNWhoHiringSource
+from shortlist.sources.curated.remoteok import RemoteOKSource
+from shortlist.sources.feeds.rss import RSSSource
 from shortlist.sources.scraped.glassdoor import GlassdoorBanDetectedError, GlassdoorSource
 from shortlist.sources.scraped.indeed import IndeedBanDetectedError, IndeedSource
 from shortlist.sources.scraped.linkedin import LinkedInBanDetectedError, LinkedInSource
+from shortlist.sources.scraped.otta import OttaBanDetectedError, OttaSource
+from shortlist.sources.scraped.wellfound import WellfoundBanDetectedError, WellfoundSource
 from shortlist.store import db as store_db
 from shortlist.store.db import (
     add_contact as store_add_contact,
@@ -123,6 +128,18 @@ sources:
   glassdoor:
     enabled: false
     rate_limit_rpm: 6
+  hn_who_hiring:
+    enabled: true
+  remoteok:
+    enabled: true
+  wellfound:
+    enabled: false
+    rate_limit_rpm: 6
+  otta:
+    enabled: false
+    rate_limit_rpm: 6
+  rss:
+    enabled: true
 ranker:
   top_k_for_llm_rerank: 30
   embedding_model: bge-small-en-v1.5
@@ -154,6 +171,11 @@ smartrecruiters_companies: []
 indeed_queries: []
 linkedin_queries: []
 glassdoor_queries: []
+hn_enabled: false
+remoteok_enabled: false
+wellfound_queries: []
+otta_queries: []
+rss_urls: []
 """
 
 
@@ -219,6 +241,16 @@ def _build_sources(prefs: Prefs) -> list[Source]:
         sources.append(LinkedInSource(queries=prefs.linkedin_queries))
     if prefs.glassdoor_queries:
         sources.append(GlassdoorSource(queries=prefs.glassdoor_queries))
+    if prefs.hn_enabled:
+        sources.append(HNWhoHiringSource())
+    if prefs.remoteok_enabled:
+        sources.append(RemoteOKSource())
+    if prefs.wellfound_queries:
+        sources.append(WellfoundSource(queries=prefs.wellfound_queries))
+    if prefs.otta_queries:
+        sources.append(OttaSource(queries=prefs.otta_queries))
+    if prefs.rss_urls:
+        sources.append(RSSSource(urls=prefs.rss_urls))
     return sources
 
 
@@ -245,7 +277,13 @@ def fetch() -> None:
                 store_db.upsert_job(db, raw)
                 total += 1
             store_db.mark_source_fetched(db, src.name, datetime.now(UTC))
-        except (IndeedBanDetectedError, LinkedInBanDetectedError, GlassdoorBanDetectedError):
+        except (
+            IndeedBanDetectedError,
+            LinkedInBanDetectedError,
+            GlassdoorBanDetectedError,
+            WellfoundBanDetectedError,
+            OttaBanDetectedError,
+        ):
             until = datetime.now(UTC) + timedelta(hours=24)
             store_db.mark_source_cooldown(db, src.name, until=until)
             console.print(f"[red]{src.name} banned — cooled down until {until.isoformat()}[/red]")
