@@ -17,6 +17,7 @@ class ShortlistApp(App[None]):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("a", "push_applications", "Applications"),
+        ("s", "push_settings", "Settings"),
     ]
 
     def __init__(self, db_path: Path | None = None) -> None:
@@ -30,6 +31,11 @@ class ShortlistApp(App[None]):
         from shortlist_tui.screens.applications import ApplicationsBoardScreen
 
         self.push_screen(ApplicationsBoardScreen(self._db_path))
+
+    def action_push_settings(self) -> None:
+        from shortlist_tui.screens.settings import SettingsScreen
+
+        self.push_screen(SettingsScreen())
 
 
 def run_tui(db_path: Path | None = None) -> None:
