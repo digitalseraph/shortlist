@@ -53,6 +53,7 @@ files = ["shortlist"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+asyncio_mode = "strict"
 markers = [
     "browser: tests requiring a real browser (Playwright); not run in CI",
     "live: tests hitting live network APIs; gated by RUN_LIVE=1",
