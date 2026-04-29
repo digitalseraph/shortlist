@@ -1,119 +1,116 @@
 # Shortlist
 
-Personal job-search assistant. Discovers postings, ranks them against your resume + preferences, tailors per-job materials, and tracks the application lifecycle. **You apply manually** — Shortlist surfaces and prepares; it never auto-submits.
+Personal job-search assistant. Discovers postings from ATS APIs, scraped boards, curated sources,
+and RSS feeds; ranks them against your resume and preferences; generates a tailored resume, cover
+letter, and notes for each target role; and tracks the full application lifecycle. **You apply
+manually** — Shortlist surfaces and prepares; it never auto-submits.
 
-**Status: feature-complete (v0.1.0).** All six plans shipped:
+**Status: v0.1.0 — feature-complete.**
 
-- ✅ Plan 1 (foundation): Greenhouse + SQLite + hard filter + CLI
-- ✅ Plan 2: Lever, Ashby, Workable, SmartRecruiters; embeddings via `sentence-transformers`; Haiku 4.5 rerank with budget guard
-- ✅ Plan 3: Sonnet 4.6 per-job tailoring; pandoc → PDF; status state machine; contacts CRUD
-- ✅ Plan 4: Textual TUI — JobList, JobDetail, ApplicationsBoard, Settings; vim-style key bindings; live search
-- ✅ Plan 5: Scraped aggregators — Indeed, LinkedIn, Glassdoor via Playwright + stealth; 24h auto-cooldown on ban; **disabled by default**
-- ✅ Plan 6: Curated boards (HN Who is hiring?, RemoteOK), Wellfound + Otta (scraped), generic RSS feeds; tag-driven GitHub Release.
+| Plan | What shipped |
+|------|-------------|
+| 1 | Greenhouse ATS, SQLite store, hard filter, Typer CLI |
+| 2 | Lever / Ashby / Workable / SmartRecruiters; sentence-transformers embeddings; Haiku rerank |
+| 3 | Sonnet tailoring → Markdown + PDF; status state machine; contacts CRUD |
+| 4 | Textual TUI — job list, detail, applications board, settings |
+| 5 | Scraped aggregators (Indeed, LinkedIn, Glassdoor) via Playwright; 24 h auto-cooldown |
+| 6 | Curated boards (HN, RemoteOK), Wellfound, Otta, generic RSS; tag-driven GitHub Release |
 
-## Install (development)
+---
+
+## Quick install
 
 ```bash
-git clone https://github.com/<user>/shortlist
+git clone https://github.com/digitalseraph/shortlist
 cd shortlist
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+playwright install chromium  # only needed for scraped sources
 ```
 
 ## First run
 
+One-time setup, then a golden-path session:
+
 ```bash
-shortlist db init                 # create ~/.local/share/shortlist/db.sqlite
-shortlist config init             # write defaults to ~/.config/shortlist/
-$EDITOR ~/.config/shortlist/prefs.yaml
-shortlist fetch                   # pull jobs for configured ATS companies
-shortlist rank --no-llm           # cheap mode: hard filter + cosine pre-rank
-shortlist rank                    # full pipeline (requires ANTHROPIC_API_KEY)
-shortlist list                    # see what survived, sorted by score
-shortlist tailor <job_id>         # generate per-job MD + PDF
-shortlist track <job_id> --status tailored
+shortlist db init                              # create ~/.local/share/shortlist/db.sqlite
+shortlist config init                          # write config + prefs defaults to ~/.config/shortlist/
+$EDITOR ~/.config/shortlist/prefs.yaml         # add company lists, job title prefs, location
+
+shortlist fetch                                # pull jobs from all enabled sources
+shortlist rank --no-llm                        # cheap pass: hard filter + cosine similarity
+shortlist list                                 # inspect results
+
+export ANTHROPIC_API_KEY=sk-ant-...
+shortlist rank                                 # full pipeline: adds Haiku rerank (Prefs key)
+shortlist tailor <job_id>                      # Sonnet: resume.md + cover.md + notes.md → PDF
 shortlist track <job_id> --status applied --applied-via "company website"
 shortlist contacts add <job_id> --name "Jane Doe" --email jane@acme.com --role recruiter
-shortlist contacts list <job_id>
-shortlist tui                     # launch the TUI
+shortlist tui                                  # browse everything in the TUI
 ```
 
-```bash
-# Curated sources (recommended — API-based, low risk):
-$EDITOR ~/.config/shortlist/prefs.yaml
-# set hn_enabled: true
-# set remoteok_enabled: true
-# add company career RSS feeds to rss_urls
+## Sources
 
-shortlist fetch                   # now includes HN + RemoteOK + your RSS feeds
-```
+| Source | Type | Default | Prefs key |
+|--------|------|---------|-----------|
+| Greenhouse | ATS API | enabled | `greenhouse_companies` |
+| Lever | ATS API | enabled | `lever_companies` |
+| Ashby | ATS API | enabled | `ashby_companies` |
+| Workable | ATS API | enabled | `workable_companies` |
+| SmartRecruiters | ATS API | enabled | `smartrecruiters_companies` |
+| Indeed | Scraped | **disabled** | `indeed_queries` |
+| LinkedIn | Scraped | **disabled** | `linkedin_queries` |
+| Glassdoor | Scraped | **disabled** | `glassdoor_queries` |
+| Wellfound | Scraped | enabled | `wellfound_queries` |
+| Otta | Scraped | enabled | `otta_queries` |
+| HN Who is Hiring? | Curated | enabled | `hn_enabled: true` |
+| RemoteOK | Curated | enabled | `remoteok_enabled: true` |
+| RSS feeds | RSS | enabled | `rss_urls` |
+
+ATS APIs are the recommended primary path — public JSON, no scraping risk. Scraped sources are
+best-effort and may trigger cooldowns. See [docs/troubleshooting.md](docs/troubleshooting.md).
+
+## Cost guide
+
+| Operation | Model | Typical cost |
+|-----------|-------|-------------|
+| `rank` (30 jobs) | Haiku 4.5 | $0.01 – $0.05 |
+| `tailor` (1 job) | Sonnet 4.6 | $0.10 – $0.30 |
+| `--no-llm` path | none | $0.00 |
+
+Set `budget.daily_usd` and `budget.monthly_usd` in `~/.config/shortlist/config.yaml` to cap
+spending. The tool will stop calling the API when a cap is reached.
 
 ## System dependencies
 
-For PDF rendering, `pandoc` and `pdflatex` (TeX Live, including LaTeX format files) must be on PATH:
+PDF rendering requires `pandoc` and `pdflatex` on PATH:
 
 - Arch / CachyOS: `sudo pacman -S pandoc texlive-core texlive-latex`
 - macOS: `brew install pandoc basictex`
 
-Without them, `shortlist tailor` still writes Markdown — only the PDF render step is skipped (with a warning).
+Without them, `shortlist tailor` still writes Markdown — only the PDF step is skipped.
 
-## TUI key bindings
+## Docs
 
-Global:
-- `q` — quit
-- `f` — fetch all sources
-- `R` — rank (full pipeline)
-- `a` — applications board
-- `s` — settings
-
-JobList screen:
-- `j`/`k` — down/up
-- `g`/`G` — top/bottom
-- `enter` — open job detail
-- `t` — tailor selected job
-- `r` — refresh
-- `/` — search by company or title
-- `escape` — clear search
-
-JobDetail screen:
-- `o` — open job URL in browser
-- `escape`/`q` — back
-
-## Scraped sources (Indeed, LinkedIn, Glassdoor)
-
-These sources ship **disabled by default** and require explicit opt-in:
-
-1. Set `enabled: true` in the relevant `sources:` block in `~/.config/shortlist/config.yaml`.
-2. Add at least one query string to `*_queries` in `~/.config/shortlist/prefs.yaml`:
-   ```yaml
-   indeed_queries:
-     - "senior backend engineer"
-   linkedin_queries:
-     - "platform engineer"
-   ```
-3. Run `playwright install chromium` once.
-
-**Expect breakage.** The three sites detect headless browsers and ban
-aggressively. When detected, the source enters a 24-hour cooldown
-recorded in `sources.cooldown_until`. Fetches will skip cooled sources
-silently. Manually clear via `shortlist sources clear-cooldown indeed`
-(or wait it out, or rotate IP).
-
-ATS APIs from Plans 1+2 (Greenhouse/Lever/Ashby/Workable/SmartRecruiters)
-remain the recommended primary path. Scrapers are a best-effort dragnet.
-
-## Design
-
-See [`docs/spec.md`](docs/spec.md) for the full design.
+| Document | Purpose |
+|----------|---------|
+| [docs/tutorial.md](docs/tutorial.md) | Zero-to-tailored walkthrough |
+| [docs/architecture.md](docs/architecture.md) | Module map, data flow, schema |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Scraped source bans, PDF issues, API errors |
+| [docs/usage.md](docs/usage.md) | TUI key bindings and CLI reference |
+| [docs/presentation.md](docs/presentation.md) | Marp slide deck for meetup / portfolio |
+| [docs/spec.md](docs/spec.md) | Original design spec |
+| [docs/plans/](docs/plans/) | Per-plan implementation notes |
 
 ## Testing
 
 ```bash
-pytest                                          # unit + integration
-pytest -m "not browser and not live"            # explicit (CI default)
-RUN_LIVE=1 pytest -m live                       # opt-in network smoke
-RUN_LIVE=1 .venv/bin/pytest -m "browser and live"  # opt-in live scrape smoke (real Indeed/LinkedIn/Glassdoor; expect occasional bans)
+pytest -m "not browser and not live"            # unit + integration (CI default)
+RUN_LIVE=1 pytest -m live                       # opt-in: network smoke tests
+RUN_LIVE=1 pytest -m "browser and live"         # opt-in: live scrape smoke
 ```
+
+Coverage target: 80%. Current: 82.96%.
 
 ## License
 
