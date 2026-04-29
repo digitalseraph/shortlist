@@ -2,12 +2,12 @@
 
 Personal job-search assistant. Discovers postings, ranks them against your resume + preferences, tailors per-job materials, and tracks the application lifecycle. **You apply manually** — Shortlist surfaces and prepares; it never auto-submits.
 
-This is **Plan 3 of 6** (tailoring + tracker). Cumulative status:
+This is **Plan 4 of 6** (Textual TUI). Cumulative status:
 
 - ✅ Plan 1 (foundation): Greenhouse + SQLite + hard filter + CLI
 - ✅ Plan 2: Lever, Ashby, Workable, SmartRecruiters; embeddings via `sentence-transformers`; Haiku 4.5 rerank with budget guard
-- ✅ Plan 3 (this): Sonnet 4.6 per-job tailoring (resume + cover + notes); pandoc → PDF; status state machine; contacts CRUD
-- ⏳ Plan 4: Textual TUI
+- ✅ Plan 3: Sonnet 4.6 per-job tailoring (resume + cover + notes); pandoc → PDF; status state machine; contacts CRUD
+- ✅ Plan 4 (this): Textual TUI — JobList, JobDetail, ApplicationsBoard, Settings; vim-style key bindings; live search
 - ⏳ Plan 5: scraped aggregators (Indeed, LinkedIn, Glassdoor) + Playwright
 - ⏳ Plan 6: curated boards (HN/Wellfound/Otta/RemoteOK) + RSS + release polish
 
@@ -35,6 +35,7 @@ shortlist track <job_id> --status tailored
 shortlist track <job_id> --status applied --applied-via "company website"
 shortlist contacts add <job_id> --name "Jane Doe" --email jane@acme.com --role recruiter
 shortlist contacts list <job_id>
+shortlist tui                     # launch the TUI
 ```
 
 ## System dependencies
@@ -45,6 +46,28 @@ For PDF rendering, `pandoc` and `pdflatex` (TeX Live, including LaTeX format fil
 - macOS: `brew install pandoc basictex`
 
 Without them, `shortlist tailor` still writes Markdown — only the PDF render step is skipped (with a warning).
+
+## TUI key bindings
+
+Global:
+- `q` — quit
+- `f` — fetch all sources
+- `R` — rank (full pipeline)
+- `a` — applications board
+- `s` — settings
+
+JobList screen:
+- `j`/`k` — down/up
+- `g`/`G` — top/bottom
+- `enter` — open job detail
+- `t` — tailor selected job
+- `r` — refresh
+- `/` — search by company or title
+- `escape` — clear search
+
+JobDetail screen:
+- `o` — open job URL in browser
+- `escape`/`q` — back
 
 ## Design
 
