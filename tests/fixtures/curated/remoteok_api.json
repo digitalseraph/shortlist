@@ -1,0 +1,29 @@
+[
+  {"legal": "Copyright RemoteOK"},
+  {
+    "id": "rok_1001",
+    "slug": "acme-senior-backend-engineer",
+    "company": "Acme",
+    "position": "Senior Backend Engineer",
+    "tags": ["python", "postgres", "remote"],
+    "description": "Build distributed services.",
+    "location": "Worldwide",
+    "salary_min": 200000,
+    "salary_max": 240000,
+    "url": "https://remoteok.com/remote-jobs/rok_1001",
+    "apply_url": "https://acme.example/apply",
+    "date": "2026-04-25T09:00:00+00:00"
+  },
+  {
+    "id": "rok_1002",
+    "company": "Globex",
+    "position": "Staff Site Reliability Engineer",
+    "tags": ["sre", "kubernetes"],
+    "description": "Multi-region SRE.",
+    "location": "USA",
+    "salary_min": null,
+    "salary_max": null,
+    "url": "https://remoteok.com/remote-jobs/rok_1002",
+    "date": "2026-04-26T10:30:00+00:00"
+  }
+]
