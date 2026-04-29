@@ -47,3 +47,36 @@ async def test_joblist_quits_on_q(tmp_path: Path) -> None:
     async with ShortlistApp(db_path=db).run_test() as pilot:
         await pilot.press("q")
         assert pilot.app.is_running is False or pilot.app.return_value is None
+
+
+@pytest.mark.asyncio
+async def test_enter_opens_job_detail(tmp_path: Path) -> None:
+    db = tmp_path / "db.sqlite"
+    migrate(db)
+    job = upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote - US",
+            remote=True,
+            description_md="Distributed Python systems.",
+        ),
+    )
+    update_score(db, job.id, score=80, reason="x", model="m")
+
+    from textual.widgets import Static
+
+    async with ShortlistApp(db_path=db).run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        # Verify JobDetail screen pushed by querying its #title widget.
+        widget = pilot.app.screen.query_one("#title", Static)
+        title = str(widget.render())
+        assert "Senior Backend Engineer" in title
+        assert "Acme" in title

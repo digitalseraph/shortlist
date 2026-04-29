@@ -21,7 +21,6 @@ class JobListScreen(Screen[None]):
         Binding("g", "cursor_top", "Top", show=False),
         Binding("G", "cursor_bottom", "Bottom", show=False),
         Binding("r", "refresh", "Refresh"),
-        Binding("enter", "select_job", "Open"),
     ]
 
     def __init__(self, db_path: Path) -> None:
@@ -74,5 +73,14 @@ class JobListScreen(Screen[None]):
         self._reload()
 
     def action_select_job(self) -> None:
-        # Detail screen lands in T4 — for now no-op.
-        pass
+        table = self.query_one(DataTable)
+        if table.cursor_row < 0 or table.cursor_row >= len(self._rows):
+            return
+        row = self._rows[table.cursor_row]
+        from shortlist_tui.screens.job_detail import JobDetailScreen
+
+        self.app.push_screen(JobDetailScreen(self._db, row.id))
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Open JobDetail when the user confirms a row (enter key on DataTable)."""
+        self.action_select_job()
