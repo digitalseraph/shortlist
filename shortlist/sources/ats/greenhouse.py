@@ -10,9 +10,13 @@ a per-job follow-up call.
 from __future__ import annotations
 
 import contextlib
+import html
 import logging
+import re
 from collections.abc import Iterator
-from typing import Any
+from datetime import datetime
+from typing import Any, ClassVar
+from urllib.parse import unquote
 
 import httpx
 from tenacity import (
@@ -23,9 +27,13 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
+from shortlist.models import RawJob
+from shortlist.sources.base import Source
+
 logger = logging.getLogger(__name__)
 
 _BASE = "https://boards-api.greenhouse.io/v1/boards"
+_TAG_RE = re.compile(r"<[^>]+>")
 
 
 class GreenhouseClient:
@@ -67,3 +75,54 @@ class GreenhouseClient:
         resp.raise_for_status()
         payload = resp.json()
         yield from payload.get("jobs", [])
+
+
+def _strip_html(s: str) -> str:
+    return _TAG_RE.sub("", html.unescape(unquote(s))).strip()
+
+
+def _is_remote(loc: str) -> bool:
+    return "remote" in loc.lower()
+
+
+def _normalize(job: dict[str, Any], *, company: str) -> RawJob:
+    location = (job.get("location") or {}).get("name") or ""
+    return RawJob(
+        source="greenhouse",
+        external_id=str(job["id"]),
+        company=company,
+        title=job["title"],
+        url=job["absolute_url"],
+        posted_at=datetime.fromisoformat(job["updated_at"]),
+        location=location or None,
+        remote=_is_remote(location),
+        description_md=_strip_html(job.get("content") or "") or None,
+    )
+
+
+class GreenhouseSource(Source):
+    """Pulls jobs from a configured set of Greenhouse boards.
+
+    `companies` maps `board_token -> display_name`. The board token is the
+    URL slug (e.g. "acme" in https://boards.greenhouse.io/acme).
+    """
+
+    name: ClassVar[str] = "greenhouse"
+
+    def __init__(
+        self,
+        *,
+        companies: dict[str, str],
+        client: GreenhouseClient | None = None,
+    ):
+        self._companies = companies
+        self._client = client or GreenhouseClient()
+
+    def fetch(self, since: datetime | None) -> Iterator[RawJob]:  # noqa: ARG002
+        for token, display in self._companies.items():
+            for raw in self._client.fetch_company(token):
+                normalized = _normalize(raw, company=display)
+                # Make external_id unique across boards: prefix with token.
+                yield normalized.model_copy(
+                    update={"external_id": f"{token}:{normalized.external_id}"}
+                )
