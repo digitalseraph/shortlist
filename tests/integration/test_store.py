@@ -22,14 +22,14 @@ def db_path(tmp_path: Path) -> Path:
 
 def test_migrate_from_zero_to_latest(db_path: Path):
     migrate(db_path)
-    assert current_version(db_path) == 2
+    assert current_version(db_path) == 3
 
 
 def test_migrate_is_idempotent(db_path: Path):
     migrate(db_path)
     migrate(db_path)
     migrate(db_path)
-    assert current_version(db_path) == 2
+    assert current_version(db_path) == 3
 
 
 def test_migrate_creates_jobs_table(db_path: Path):
@@ -147,7 +147,7 @@ def test_update_score(db_path):
 
 def test_migrate_to_v2_creates_embeddings_tables(db_path: Path):
     migrate(db_path)
-    assert current_version(db_path) == 2
+    assert current_version(db_path) == 3
     with connect(db_path) as conn:
         names = {
             r[0]
@@ -205,3 +205,32 @@ def test_cosine_top_k_returns_ordered_job_ids(db_path: Path):
 
     top = cosine_top_k(db_path, target, k=2)
     assert [j for (j, _d) in top] == [j2.id, j1.id]
+
+
+def test_migrate_to_v3_creates_applications_and_contacts(db_path: Path):
+    migrate(db_path)
+    assert current_version(db_path) == 3
+    with connect(db_path) as conn:
+        names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "applications" in names
+    assert "contacts" in names
+    assert "tailor_outputs" in names
+
+
+def test_contacts_cascade_delete_with_application(db_path: Path):
+    migrate(db_path)
+    job = upsert_job(db_path, _raw())
+    with connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO applications (job_id, applied_at) VALUES (?, ?)",
+            (job.id, "2026-04-28T12:00:00Z"),
+        )
+        conn.execute(
+            "INSERT INTO contacts (application_id, name, created_at) VALUES (?, ?, ?)",
+            (job.id, "Jane Doe", "2026-04-28T12:00:00Z"),
+        )
+    with connect(db_path) as conn:
+        conn.execute("DELETE FROM applications WHERE job_id = ?", (job.id,))
+    with connect(db_path) as conn:
+        rows = conn.execute("SELECT COUNT(*) FROM contacts").fetchone()
+    assert rows[0] == 0
