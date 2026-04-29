@@ -444,3 +444,34 @@ def test_cli_tui_help_does_not_error(env):
     result = runner.invoke(app, ["tui", "--help"])
     assert result.exit_code == 0
     assert "TUI" in result.output or "tui" in result.output.lower()
+
+
+def test_fetch_skips_source_in_cooldown(env, monkeypatch):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    (cfg / "prefs.yaml").write_text(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
+            "indeed_queries: []",
+            "indeed_queries:\n  - python backend",
+        )
+    )
+    runner.invoke(app, ["db", "init"])
+    from datetime import UTC, datetime, timedelta
+
+    from shortlist.store.db import mark_source_cooldown
+
+    mark_source_cooldown(
+        data / "db.sqlite",
+        "indeed",
+        until=datetime.now(UTC) + timedelta(hours=24),
+    )
+
+    result = runner.invoke(app, ["fetch"])
+    assert result.exit_code == 0, result.output
+    assert (
+        "cooldown" in result.output.lower()
+        or "cooled" in result.output.lower()
+        or "skipping" in result.output.lower()
+    )

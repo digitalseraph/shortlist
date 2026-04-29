@@ -7,7 +7,7 @@ that screens can display.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,9 @@ from shortlist.sources.ats.lever import LeverSource
 from shortlist.sources.ats.smartrecruiters import SmartRecruitersSource
 from shortlist.sources.ats.workable import WorkableSource
 from shortlist.sources.base import Source
+from shortlist.sources.scraped.glassdoor import GlassdoorBanDetectedError, GlassdoorSource
+from shortlist.sources.scraped.indeed import IndeedBanDetectedError, IndeedSource
+from shortlist.sources.scraped.linkedin import LinkedInBanDetectedError, LinkedInSource
 from shortlist.store import db as store_db
 from shortlist.tailor.orchestrator import TailorOrchestrator
 
@@ -41,6 +44,12 @@ def _build_sources(prefs: Prefs) -> list[Source]:
         sources.append(
             SmartRecruitersSource(companies={t: t for t in prefs.smartrecruiters_companies})
         )
+    if prefs.indeed_queries:
+        sources.append(IndeedSource(queries=prefs.indeed_queries))
+    if prefs.linkedin_queries:
+        sources.append(LinkedInSource(queries=prefs.linkedin_queries))
+    if prefs.glassdoor_queries:
+        sources.append(GlassdoorSource(queries=prefs.glassdoor_queries))
     return sources
 
 
@@ -48,17 +57,31 @@ def fetch_all(db_path: Path, prefs: Prefs) -> str:
     """Pull jobs from every configured source. Returns a summary line."""
     total = 0
     errors: list[str] = []
+    cooled: list[str] = []
     for src in _build_sources(prefs):
+        if store_db.is_source_in_cooldown(db_path, src.name):
+            cooled.append(src.name)
+            continue
         try:
             for raw in src.fetch(since=store_db.source_last_fetched(db_path, src.name)):
                 store_db.upsert_job(db_path, raw)
                 total += 1
             store_db.mark_source_fetched(db_path, src.name, datetime.now(UTC))
+        except (IndeedBanDetectedError, LinkedInBanDetectedError, GlassdoorBanDetectedError):
+            store_db.mark_source_cooldown(
+                db_path,
+                src.name,
+                until=datetime.now(UTC) + timedelta(hours=24),
+            )
+            errors.append(f"{src.name}: banned, cooled 24h")
         except Exception as e:  # noqa: BLE001
             errors.append(f"{src.name}: {e}")
+    parts = [f"fetched {total} jobs"]
+    if cooled:
+        parts.append(f"({len(cooled)} cooled)")
     if errors:
-        return f"fetched {total} jobs ({len(errors)} source errors)"
-    return f"fetched {total} jobs"
+        parts.append(f"({len(errors)} errors)")
+    return " ".join(parts)
 
 
 def rank_all(

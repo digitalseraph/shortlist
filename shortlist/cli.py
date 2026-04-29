@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import importlib.resources as _ir
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import typer
@@ -27,6 +27,9 @@ from shortlist.sources.ats.lever import LeverSource
 from shortlist.sources.ats.smartrecruiters import SmartRecruitersSource
 from shortlist.sources.ats.workable import WorkableSource
 from shortlist.sources.base import Source
+from shortlist.sources.scraped.glassdoor import GlassdoorBanDetectedError, GlassdoorSource
+from shortlist.sources.scraped.indeed import IndeedBanDetectedError, IndeedSource
+from shortlist.sources.scraped.linkedin import LinkedInBanDetectedError, LinkedInSource
 from shortlist.store import db as store_db
 from shortlist.store.db import (
     add_contact as store_add_contact,
@@ -111,6 +114,15 @@ sources:
   greenhouse:
     enabled: true
     rate_limit_rpm: 30
+  indeed:
+    enabled: false
+    rate_limit_rpm: 6
+  linkedin:
+    enabled: false
+    rate_limit_rpm: 4
+  glassdoor:
+    enabled: false
+    rate_limit_rpm: 6
 ranker:
   top_k_for_llm_rerank: 30
   embedding_model: bge-small-en-v1.5
@@ -139,6 +151,9 @@ lever_companies: []
 ashby_companies: []
 workable_companies: []
 smartrecruiters_companies: []
+indeed_queries: []
+linkedin_queries: []
+glassdoor_queries: []
 """
 
 
@@ -198,6 +213,12 @@ def _build_sources(prefs: Prefs) -> list[Source]:
         sources.append(
             SmartRecruitersSource(companies={t: t for t in prefs.smartrecruiters_companies})
         )
+    if prefs.indeed_queries:
+        sources.append(IndeedSource(queries=prefs.indeed_queries))
+    if prefs.linkedin_queries:
+        sources.append(LinkedInSource(queries=prefs.linkedin_queries))
+    if prefs.glassdoor_queries:
+        sources.append(GlassdoorSource(queries=prefs.glassdoor_queries))
     return sources
 
 
@@ -216,11 +237,18 @@ def fetch() -> None:
 
     total = 0
     for src in _build_sources(prefs):
+        if store_db.is_source_in_cooldown(db, src.name):
+            console.print(f"[dim]{src.name} in cooldown, skipping[/dim]")
+            continue
         try:
             for raw in src.fetch(since=store_db.source_last_fetched(db, src.name)):
                 store_db.upsert_job(db, raw)
                 total += 1
             store_db.mark_source_fetched(db, src.name, datetime.now(UTC))
+        except (IndeedBanDetectedError, LinkedInBanDetectedError, GlassdoorBanDetectedError):
+            until = datetime.now(UTC) + timedelta(hours=24)
+            store_db.mark_source_cooldown(db, src.name, until=until)
+            console.print(f"[red]{src.name} banned — cooled down until {until.isoformat()}[/red]")
         except Exception as e:  # noqa: BLE001 — surface and continue
             console.print(f"[yellow]{src.name} error:[/yellow] {e}")
 
