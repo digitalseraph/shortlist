@@ -2,14 +2,14 @@
 
 Personal job-search assistant. Discovers postings, ranks them against your resume + preferences, tailors per-job materials, and tracks the application lifecycle. **You apply manually** — Shortlist surfaces and prepares; it never auto-submits.
 
-This is **Plan 5 of 6** (scraped aggregators). Cumulative status:
+**Status: feature-complete (v0.1.0).** All six plans shipped:
 
 - ✅ Plan 1 (foundation): Greenhouse + SQLite + hard filter + CLI
 - ✅ Plan 2: Lever, Ashby, Workable, SmartRecruiters; embeddings via `sentence-transformers`; Haiku 4.5 rerank with budget guard
 - ✅ Plan 3: Sonnet 4.6 per-job tailoring; pandoc → PDF; status state machine; contacts CRUD
 - ✅ Plan 4: Textual TUI — JobList, JobDetail, ApplicationsBoard, Settings; vim-style key bindings; live search
-- ✅ Plan 5 (this): Scraped aggregators — Indeed, LinkedIn, Glassdoor via Playwright + stealth; 24h auto-cooldown on ban; **disabled by default**
-- ⏳ Plan 6: curated boards (HN/Wellfound/Otta/RemoteOK) + RSS + release polish
+- ✅ Plan 5: Scraped aggregators — Indeed, LinkedIn, Glassdoor via Playwright + stealth; 24h auto-cooldown on ban; **disabled by default**
+- ✅ Plan 6: Curated boards (HN Who is hiring?, RemoteOK), Wellfound + Otta (scraped), generic RSS feeds; tag-driven GitHub Release.
 
 ## Install (development)
 
@@ -36,6 +36,16 @@ shortlist track <job_id> --status applied --applied-via "company website"
 shortlist contacts add <job_id> --name "Jane Doe" --email jane@acme.com --role recruiter
 shortlist contacts list <job_id>
 shortlist tui                     # launch the TUI
+```
+
+```bash
+# Curated sources (recommended — API-based, low risk):
+$EDITOR ~/.config/shortlist/prefs.yaml
+# set hn_enabled: true
+# set remoteok_enabled: true
+# add company career RSS feeds to rss_urls
+
+shortlist fetch                   # now includes HN + RemoteOK + your RSS feeds
 ```
 
 ## System dependencies
