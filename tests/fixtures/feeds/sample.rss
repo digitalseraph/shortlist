@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Acme Careers</title>
+    <link>https://acme.example/careers</link>
+    <description>Open roles at Acme</description>
+    <item>
+      <title>Senior Backend Engineer</title>
+      <link>https://acme.example/careers/be-senior</link>
+      <description>Build distributed services in Python. Remote.</description>
+      <pubDate>Sat, 25 Apr 2026 09:00:00 GMT</pubDate>
+      <guid isPermaLink="false">acme-be-senior-001</guid>
+    </item>
+    <item>
+      <title>Staff SRE</title>
+      <link>https://acme.example/careers/sre-staff</link>
+      <description>Multi-region Kubernetes. Atlanta.</description>
+      <pubDate>Sun, 26 Apr 2026 10:30:00 GMT</pubDate>
+      <guid isPermaLink="false">acme-sre-staff-002</guid>
+    </item>
+  </channel>
+</rss>
