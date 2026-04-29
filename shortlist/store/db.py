@@ -182,6 +182,28 @@ def list_jobs(
     return [_row_to_job(r) for r in rows]
 
 
+def update_score(
+    path: Path,
+    job_id: int,
+    *,
+    score: int,
+    reason: str,
+    model: str,
+    when: datetime | None = None,
+) -> None:
+    """Update the score fields for a job."""
+    when = when or datetime.now(UTC)
+    with connect(path) as conn:
+        conn.execute(
+            """
+            UPDATE jobs SET score = ?, score_reason = ?, scored_with_model = ?,
+                            scored_with_prefs_at = ?
+            WHERE id = ?
+            """,
+            (score, reason, model, _utc_iso(when), job_id),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Source helpers
 # ---------------------------------------------------------------------------

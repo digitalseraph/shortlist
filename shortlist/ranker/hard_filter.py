@@ -29,7 +29,10 @@ def passes(job: Job, prefs: Prefs) -> bool:
     if _ci_any(prefs.exclude_keywords, text):
         return False
 
-    if not _ci_any(prefs.titles, title):
+    # Title preference is a soft hint; seniority is the hard gate.
+    # A job passes the title check if the titles list is empty, any preferred
+    # title is a substring of the job title, OR the seniority already matches.
+    if prefs.titles and not _ci_any(prefs.titles, title) and not _ci_any(prefs.seniority, title):
         return False
 
     if not _ci_any(prefs.seniority, title):

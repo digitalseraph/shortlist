@@ -131,3 +131,15 @@ def test_source_fetched_marker(db_path):
     mark_source_fetched(db_path, "greenhouse", when)
     got = source_last_fetched(db_path, "greenhouse")
     assert got == when
+
+
+def test_update_score(db_path):
+    migrate(db_path)
+    job = upsert_job(db_path, _raw())
+    from shortlist.store.db import update_score
+
+    update_score(db_path, job.id, score=42, reason="hard filter pass", model="hard_filter")
+    out = list_jobs(db_path)[0]
+    assert out.score == 42
+    assert out.score_reason == "hard filter pass"
+    assert out.scored_with_model == "hard_filter"

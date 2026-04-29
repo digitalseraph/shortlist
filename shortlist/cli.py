@@ -177,3 +177,39 @@ def fetch() -> None:
             console.print(f"[yellow]greenhouse error:[/yellow] {e}")
 
     console.print(f"fetched {total} jobs")
+
+
+# --- rank -----------------------------------------------------------------
+
+from shortlist.ranker.hard_filter import passes  # noqa: E402
+
+
+@app.command("rank")
+def rank() -> None:
+    """Score stored jobs.
+
+    Plan 1: hard filter only. Passes -> score 50, fails -> score 0.
+    Plan 2 will replace this with embeddings + Haiku rerank.
+    """
+    if not paths.prefs_path().exists():
+        console.print("[red]error[/red] run `shortlist config init` first")
+        raise typer.Exit(code=2)
+    if not paths.db_path().exists():
+        console.print("[red]error[/red] run `shortlist db init` first")
+        raise typer.Exit(code=2)
+
+    prefs = load_prefs(paths.prefs_path())
+    db = paths.db_path()
+    pass_count = fail_count = 0
+
+    for job in store_db.list_jobs(db):
+        if passes(job, prefs):
+            store_db.update_score(
+                db, job.id, score=50, reason="passed hard filter", model="hard_filter"
+            )
+            pass_count += 1
+        else:
+            store_db.update_score(db, job.id, score=0, reason="filtered out", model="hard_filter")
+            fail_count += 1
+
+    console.print(f"ranked: {pass_count} pass / {fail_count} filtered")

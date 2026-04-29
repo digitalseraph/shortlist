@@ -141,3 +141,37 @@ def test_fetch_handles_source_error_gracefully(env):
     # Source error must not crash the CLI.
     assert result.exit_code == 0
     assert "0 jobs" in result.output.lower() or "error" in result.output.lower()
+
+
+@respx.mock
+def test_rank_scores_passing_jobs_high_failing_low(env):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    (cfg / "prefs.yaml").write_text(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
+            "greenhouse_companies: []",
+            "greenhouse_companies:\n  - acme",
+        )
+    )
+    runner.invoke(app, ["db", "init"])
+
+    payload = json.loads((FIXTURES / "greenhouse_acme_page1.json").read_text())
+    respx.get(
+        "https://boards-api.greenhouse.io/v1/boards/acme/jobs",
+        params={"content": "true"},
+    ).mock(return_value=httpx.Response(200, json=payload))
+    runner.invoke(app, ["fetch"])
+
+    result = runner.invoke(app, ["rank"])
+    assert result.exit_code == 0, result.output
+
+    # Two seeded jobs: "Senior Backend Engineer" (passes) and
+    # "Staff Platform Engineer" (passes via "staff" seniority).
+    # Both pass hard filter -> score 50 (placeholder for Plan 1).
+    from shortlist.store.db import list_jobs
+
+    jobs = list_jobs(data / "db.sqlite")
+    scores = sorted(j.score for j in jobs if j.score is not None)
+    assert scores == [50, 50]
