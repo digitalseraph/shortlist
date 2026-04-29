@@ -1,11 +1,17 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from shortlist.models import Job, RawJob
 from shortlist.store.db import (
     connect,
     current_version,
+    list_jobs,
+    mark_source_fetched,
     migrate,
+    source_last_fetched,
+    upsert_job,
 )
 
 
@@ -68,3 +74,60 @@ def test_jobs_unique_constraint(db_path: Path):
                     "2026-04-28T12:00:00Z",
                 ),
             )
+
+
+def _raw(external_id: str = "gh_1", *, title: str = "Senior Backend Engineer") -> RawJob:
+    return RawJob(
+        source="greenhouse",
+        external_id=external_id,
+        company="Acme",
+        title=title,
+        url="https://example.com/jobs/" + external_id,
+        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+        location="Remote - US",
+        remote=True,
+    )
+
+
+def test_upsert_inserts_new_job(db_path):
+    migrate(db_path)
+    job = upsert_job(db_path, _raw())
+    assert isinstance(job, Job)
+    assert job.id > 0
+    assert job.title == "Senior Backend Engineer"
+    assert job.status == "new"
+
+
+def test_upsert_updates_existing_job(db_path):
+    migrate(db_path)
+    a = upsert_job(db_path, _raw(title="Old Title"))
+    b = upsert_job(db_path, _raw(title="New Title"))
+    assert a.id == b.id
+    assert b.title == "New Title"
+
+
+def test_list_jobs_returns_all(db_path):
+    migrate(db_path)
+    upsert_job(db_path, _raw("gh_1"))
+    upsert_job(db_path, _raw("gh_2"))
+    jobs = list_jobs(db_path)
+    assert len(jobs) == 2
+
+
+def test_list_jobs_filters_by_status(db_path):
+    migrate(db_path)
+    upsert_job(db_path, _raw("gh_1"))
+    upsert_job(db_path, _raw("gh_2"))
+    jobs = list_jobs(db_path, status="new")
+    assert len(jobs) == 2
+    jobs = list_jobs(db_path, status="applied")
+    assert jobs == []
+
+
+def test_source_fetched_marker(db_path):
+    migrate(db_path)
+    assert source_last_fetched(db_path, "greenhouse") is None
+    when = datetime(2026, 4, 28, 12, 0, tzinfo=UTC)
+    mark_source_fetched(db_path, "greenhouse", when)
+    got = source_last_fetched(db_path, "greenhouse")
+    assert got == when
