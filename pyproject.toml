@@ -1,6 +1,6 @@
 [project]
 name = "shortlist"
-version = "0.0.1"
+version = "0.1.0"
 description = "Personal job-search assistant: discover, rank, tailor, track."
 readme = "README.md"
 requires-python = ">=3.12"
