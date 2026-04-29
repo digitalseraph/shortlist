@@ -3,6 +3,7 @@
 RawJob: shape returned by source clients before persistence.
 Job:    shape after the row is in SQLite (has id, status, scoring fields).
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -11,8 +12,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 JobStatus = Literal[
-    "new", "tailored", "applied", "screen", "interview",
-    "offer", "rejected", "withdrawn",
+    "new",
+    "tailored",
+    "applied",
+    "screen",
+    "interview",
+    "offer",
+    "rejected",
+    "withdrawn",
 ]
 
 

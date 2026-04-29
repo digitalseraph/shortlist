@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
 
@@ -12,7 +13,7 @@ def test_rawjob_minimum_fields():
         company="Acme Corp",
         title="Senior Backend Engineer",
         url="https://example.com/jobs/4521",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=timezone.utc),
+        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
     )
     assert raw.source == "greenhouse"
     assert raw.external_id == "gh_4521"
@@ -40,8 +41,8 @@ def test_job_status_default_is_new():
         company="Acme",
         title="Eng",
         url="https://example.com",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=timezone.utc),
-        discovered_at=datetime(2026, 4, 28, 12, 0, tzinfo=timezone.utc),
+        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+        discovered_at=datetime(2026, 4, 28, 12, 0, tzinfo=UTC),
     )
     assert job.status == "new"
 
@@ -49,7 +50,13 @@ def test_job_status_default_is_new():
 def test_job_score_bounds():
     with pytest.raises(ValidationError):
         Job(
-            id=1, source="x", external_id="x", company="x", title="x",
-            url="https://x", posted_at=datetime.now(timezone.utc),
-            discovered_at=datetime.now(timezone.utc), score=101,
+            id=1,
+            source="x",
+            external_id="x",
+            company="x",
+            title="x",
+            url="https://x",
+            posted_at=datetime.now(UTC),
+            discovered_at=datetime.now(UTC),
+            score=101,
         )
