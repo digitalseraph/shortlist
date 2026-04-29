@@ -2,13 +2,13 @@
 
 Personal job-search assistant. Discovers postings, ranks them against your resume + preferences, tailors per-job materials, and tracks the application lifecycle. **You apply manually** — Shortlist surfaces and prepares; it never auto-submits.
 
-This is **Plan 4 of 6** (Textual TUI). Cumulative status:
+This is **Plan 5 of 6** (scraped aggregators). Cumulative status:
 
 - ✅ Plan 1 (foundation): Greenhouse + SQLite + hard filter + CLI
 - ✅ Plan 2: Lever, Ashby, Workable, SmartRecruiters; embeddings via `sentence-transformers`; Haiku 4.5 rerank with budget guard
-- ✅ Plan 3: Sonnet 4.6 per-job tailoring (resume + cover + notes); pandoc → PDF; status state machine; contacts CRUD
-- ✅ Plan 4 (this): Textual TUI — JobList, JobDetail, ApplicationsBoard, Settings; vim-style key bindings; live search
-- ⏳ Plan 5: scraped aggregators (Indeed, LinkedIn, Glassdoor) + Playwright
+- ✅ Plan 3: Sonnet 4.6 per-job tailoring; pandoc → PDF; status state machine; contacts CRUD
+- ✅ Plan 4: Textual TUI — JobList, JobDetail, ApplicationsBoard, Settings; vim-style key bindings; live search
+- ✅ Plan 5 (this): Scraped aggregators — Indeed, LinkedIn, Glassdoor via Playwright + stealth; 24h auto-cooldown on ban; **disabled by default**
 - ⏳ Plan 6: curated boards (HN/Wellfound/Otta/RemoteOK) + RSS + release polish
 
 ## Install (development)
@@ -69,6 +69,29 @@ JobDetail screen:
 - `o` — open job URL in browser
 - `escape`/`q` — back
 
+## Scraped sources (Indeed, LinkedIn, Glassdoor)
+
+These sources ship **disabled by default** and require explicit opt-in:
+
+1. Set `enabled: true` in the relevant `sources:` block in `~/.config/shortlist/config.yaml`.
+2. Add at least one query string to `*_queries` in `~/.config/shortlist/prefs.yaml`:
+   ```yaml
+   indeed_queries:
+     - "senior backend engineer"
+   linkedin_queries:
+     - "platform engineer"
+   ```
+3. Run `playwright install chromium` once.
+
+**Expect breakage.** The three sites detect headless browsers and ban
+aggressively. When detected, the source enters a 24-hour cooldown
+recorded in `sources.cooldown_until`. Fetches will skip cooled sources
+silently. Manually clear via `shortlist sources clear-cooldown indeed`
+(or wait it out, or rotate IP).
+
+ATS APIs from Plans 1+2 (Greenhouse/Lever/Ashby/Workable/SmartRecruiters)
+remain the recommended primary path. Scrapers are a best-effort dragnet.
+
 ## Design
 
 See [`docs/spec.md`](docs/spec.md) for the full design.
@@ -79,6 +102,7 @@ See [`docs/spec.md`](docs/spec.md) for the full design.
 pytest                                          # unit + integration
 pytest -m "not browser and not live"            # explicit (CI default)
 RUN_LIVE=1 pytest -m live                       # opt-in network smoke
+RUN_LIVE=1 .venv/bin/pytest -m "browser and live"  # opt-in live scrape smoke (real Indeed/LinkedIn/Glassdoor; expect occasional bans)
 ```
 
 ## License
