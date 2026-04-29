@@ -1,0 +1,46 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "totalFound": 2,
+  "content": [
+    {
+      "id": "sr_001",
+      "name": "Senior Backend Engineer",
+      "uuid": "sr-uuid-1",
+      "releasedDate": "2026-04-25T09:00:00.000Z",
+      "location": {
+        "city": "Remote",
+        "region": "US",
+        "country": "us",
+        "remote": true,
+        "fullLocation": "Remote, US"
+      },
+      "jobAd": {
+        "sections": {
+          "jobDescription": {"text": "<p>Build services.</p>"},
+          "qualifications": {"text": "<p>5+ years.</p>"}
+        }
+      },
+      "applyUrl": "https://jobs.smartrecruiters.com/Acme/sr-uuid-1"
+    },
+    {
+      "id": "sr_002",
+      "name": "Staff Engineer",
+      "uuid": "sr-uuid-2",
+      "releasedDate": "2026-04-26T10:30:00.000Z",
+      "location": {
+        "city": "Atlanta",
+        "region": "GA",
+        "country": "us",
+        "remote": false,
+        "fullLocation": "Atlanta, GA, US"
+      },
+      "jobAd": {
+        "sections": {
+          "jobDescription": {"text": "<p>Architecture.</p>"}
+        }
+      },
+      "applyUrl": "https://jobs.smartrecruiters.com/Acme/sr-uuid-2"
+    }
+  ]
+}
