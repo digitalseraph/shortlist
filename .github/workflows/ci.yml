@@ -33,4 +33,4 @@ jobs:
         run: mypy shortlist
 
       - name: pytest
-        run: pytest --cov=shortlist --cov-report=term-missing --cov-fail-under=80
+        run: pytest -m "not browser and not live" --cov=shortlist --cov=shortlist_tui --cov-report=term-missing --cov-fail-under=80
