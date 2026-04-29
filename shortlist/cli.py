@@ -207,10 +207,13 @@ def fetch() -> None:
 
 # --- rank -----------------------------------------------------------------
 
+from anthropic import Anthropic  # noqa: E402
+
 from shortlist.config import load_config  # noqa: E402
 from shortlist.ranker.embeddings import EmbeddingService  # noqa: E402
 from shortlist.ranker.llm_rerank import LLMReranker  # noqa: E402
 from shortlist.ranker.pipeline import run_pipeline  # noqa: E402
+from shortlist.tailor.orchestrator import TailorOrchestrator  # noqa: E402
 
 
 @app.command("rank")
@@ -245,8 +248,6 @@ def rank(
                 f"[yellow]{cfg.anthropic.key_env_var} not set — running with --no-llm[/yellow]"
             )
         else:
-            from anthropic import Anthropic
-
             reranker = LLMReranker(
                 client=Anthropic(api_key=key),
                 model=cfg.ranker.rerank_model,
@@ -263,6 +264,48 @@ def rank(
     console.print(
         f"ranked: filtered={summary.filtered}, cosine_top_k={summary.cosine_top_k}, "
         f"llm_scored={summary.llm_scored}, cost=${summary.cost_usd:.4f}"
+    )
+
+
+@app.command("tailor")
+def tailor_cmd(
+    job_id: int = typer.Argument(..., help="Job id to tailor materials for."),
+    cover_paragraphs: int = typer.Option(3, "--cover-paras"),
+) -> None:
+    """Generate per-job resume + cover + notes (Markdown + PDF)."""
+    if not paths.config_path().exists() or not paths.prefs_path().exists():
+        console.print("[red]error[/red] run `shortlist config init` first")
+        raise typer.Exit(code=2)
+    if not paths.db_path().exists():
+        console.print("[red]error[/red] run `shortlist db init` first")
+        raise typer.Exit(code=2)
+
+    cfg = load_config(paths.config_path())
+    prefs = load_prefs(paths.prefs_path())
+    resume = cfg.paths.resume.expanduser()
+    if not resume.exists():
+        console.print(f"[red]error[/red] resume not found at {resume}")
+        raise typer.Exit(code=2)
+
+    import os
+
+    key = os.environ.get(cfg.anthropic.key_env_var, "")
+    if not key:
+        console.print(f"[red]error[/red] {cfg.anthropic.key_env_var} not set")
+        raise typer.Exit(code=2)
+
+    orch = TailorOrchestrator(
+        db_path=paths.db_path(),
+        output_root=cfg.paths.output_dir.expanduser(),
+        anthropic_client=Anthropic(api_key=key),
+        model=cfg.tailor.model,
+        pdf_template=cfg.paths.pdf_template,
+        cover_paragraphs=cover_paragraphs,
+    )
+    out = orch.tailor(job_id=job_id, resume_path=resume, prefs=prefs)
+    console.print(
+        f"[green]wrote[/green] {out.output_dir} "
+        f"(${out.cost_usd:.4f}, {out.tokens_in + out.tokens_out} tok)"
     )
 
 

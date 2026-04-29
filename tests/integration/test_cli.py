@@ -294,3 +294,68 @@ def test_fetch_iterates_all_configured_sources(env):
     assert result.exit_code == 0, result.output
     # 2 GH + 2 Lever + 2 Ashby = 6
     assert "fetched 6 jobs" in result.output.lower()
+
+
+def test_cli_tailor_writes_outputs(env, tmp_path, monkeypatch):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    (cfg / "prefs.yaml").write_text(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
+            "greenhouse_companies: []",
+            "greenhouse_companies:\n  - acme",
+        )
+    )
+    resume = tmp_path / "resume.md"
+    resume.write_text("R")
+    out_dir = tmp_path / "jobs"
+    cfg_text = (
+        (cfg / "config.yaml")
+        .read_text()
+        .replace("resume: ~/jobs/resume.md", f"resume: {resume}")
+        .replace("output_dir: ~/jobs", f"output_dir: {out_dir}")
+    )
+    (cfg / "config.yaml").write_text(cfg_text)
+
+    runner.invoke(app, ["db", "init"])
+    from datetime import UTC, datetime
+
+    from shortlist.models import RawJob
+    from shortlist.store.db import upsert_job
+
+    j = upsert_job(
+        data / "db.sqlite",
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme Corp",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote - US",
+            remote=True,
+            description_md="Python services.",
+        ),
+    )
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
+    from unittest.mock import MagicMock
+
+    fake_anth = MagicMock()
+    msg = MagicMock()
+    fixture = Path(__file__).parent.parent / "fixtures/llm_responses/sonnet_tailor_sample.md"
+    msg.content = [MagicMock(text=fixture.read_text())]
+    msg.usage.input_tokens = 1500
+    msg.usage.output_tokens = 1200
+    fake_anth.messages.create.return_value = msg
+    import shortlist.cli as cli_mod
+
+    monkeypatch.setattr(cli_mod, "Anthropic", lambda **_kw: fake_anth)
+
+    result = runner.invoke(app, ["tailor", str(j.id)])
+    assert result.exit_code == 0, result.output
+    dirs = list(out_dir.iterdir())
+    assert len(dirs) == 1
+    files = {p.name for p in dirs[0].iterdir()}
+    assert {"resume.md", "cover.md", "notes.md"} <= files
