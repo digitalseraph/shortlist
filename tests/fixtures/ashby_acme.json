@@ -1,0 +1,29 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "ash-uuid-1",
+      "title": "Senior Backend Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "location": "Remote",
+      "employmentType": "FullTime",
+      "descriptionHtml": "<p>Build distributed systems.</p>",
+      "jobUrl": "https://jobs.ashbyhq.com/acme/ash-uuid-1",
+      "publishedAt": "2026-04-25T13:00:00.000Z",
+      "compensationTierSummary": "$200k–$240k USD"
+    },
+    {
+      "id": "ash-uuid-2",
+      "title": "Staff Engineer",
+      "department": "Engineering",
+      "team": "Core",
+      "location": "Atlanta",
+      "employmentType": "FullTime",
+      "descriptionHtml": "<p>Lead architecture.</p>",
+      "jobUrl": "https://jobs.ashbyhq.com/acme/ash-uuid-2",
+      "publishedAt": "2026-04-26T14:30:00.000Z",
+      "compensationTierSummary": null
+    }
+  ]
+}
