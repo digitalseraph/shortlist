@@ -359,3 +359,81 @@ def test_cli_tailor_writes_outputs(env, tmp_path, monkeypatch):
     assert len(dirs) == 1
     files = {p.name for p in dirs[0].iterdir()}
     assert {"resume.md", "cover.md", "notes.md"} <= files
+
+
+def test_track_status_transition(env, tmp_path):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    runner.invoke(app, ["db", "init"])
+    from datetime import UTC, datetime
+
+    from shortlist.models import RawJob
+    from shortlist.store.db import upsert_job
+
+    j = upsert_job(
+        data / "db.sqlite",
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+        ),
+    )
+    result = runner.invoke(app, ["track", str(j.id), "--status", "tailored"])
+    assert result.exit_code == 0
+    result = runner.invoke(
+        app, ["track", str(j.id), "--status", "applied", "--applied-via", "company website"]
+    )
+    assert result.exit_code == 0
+    result = runner.invoke(app, ["track", str(j.id), "--status", "interview"])
+    assert result.exit_code != 0
+
+
+def test_contacts_add_list_remove(env, tmp_path):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    runner.invoke(app, ["db", "init"])
+    from datetime import UTC, datetime
+
+    from shortlist.models import RawJob
+    from shortlist.store.db import upsert_job
+
+    j = upsert_job(
+        data / "db.sqlite",
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+        ),
+    )
+    runner.invoke(app, ["track", str(j.id), "--status", "tailored"])
+    runner.invoke(app, ["track", str(j.id), "--status", "applied"])
+
+    result = runner.invoke(
+        app,
+        [
+            "contacts",
+            "add",
+            str(j.id),
+            "--name",
+            "Jane Doe",
+            "--email",
+            "jane@acme.com",
+            "--role",
+            "recruiter",
+        ],
+    )
+    assert result.exit_code == 0
+
+    result = runner.invoke(app, ["contacts", "list", str(j.id)])
+    assert "Jane Doe" in result.output
+    assert "jane@acme.com" in result.output

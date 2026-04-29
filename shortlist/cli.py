@@ -27,6 +27,20 @@ from shortlist.sources.ats.smartrecruiters import SmartRecruitersSource
 from shortlist.sources.ats.workable import WorkableSource
 from shortlist.sources.base import Source
 from shortlist.store import db as store_db
+from shortlist.store.db import (
+    add_contact as store_add_contact,
+)
+from shortlist.store.db import (
+    list_contacts as store_list_contacts,
+)
+from shortlist.store.db import (
+    remove_contact as store_remove_contact,
+)
+from shortlist.store.db import (
+    transition_status,
+    update_application,
+)
+from shortlist.tracker.state import InvalidStatusTransitionError
 
 app = typer.Typer(no_args_is_help=True, help="Shortlist — personal job search.")
 console = Console()
@@ -340,3 +354,89 @@ def list_jobs_cmd(
             str(j.url),
         )
     console.print(table)
+
+
+# --- track ----------------------------------------------------------------
+
+
+@app.command("track")
+def track_cmd(
+    job_id: int = typer.Argument(...),
+    status: str = typer.Option(..., "--status", help="Target status."),
+    notes: str | None = typer.Option(None, "--notes"),
+    applied_via: str | None = typer.Option(None, "--applied-via"),
+) -> None:
+    """Transition a job through the application lifecycle."""
+    if not paths.db_path().exists():
+        console.print("[red]error[/red] run `shortlist db init` first")
+        raise typer.Exit(code=2)
+    try:
+        transition_status(paths.db_path(), job_id, status)  # type: ignore[arg-type]
+    except InvalidStatusTransitionError as e:
+        console.print(f"[red]error[/red] {e}")
+        raise typer.Exit(code=1) from e
+    except ValueError as e:
+        console.print(f"[red]error[/red] {e}")
+        raise typer.Exit(code=2) from e
+
+    if status == "applied":
+        update_application(
+            paths.db_path(),
+            job_id,
+            applied_at=datetime.now(UTC),
+            applied_via=applied_via or "(unspecified)",
+        )
+    if notes:
+        update_application(paths.db_path(), job_id, lessons=notes)
+    console.print(f"[green]ok[/green] job {job_id} → {status}")
+
+
+# --- contacts subgroup ----------------------------------------------------
+
+contacts_app = typer.Typer(help="Manage contacts on applications.")
+app.add_typer(contacts_app, name="contacts")
+
+
+@contacts_app.command("add")
+def contacts_add(
+    job_id: int = typer.Argument(...),
+    name: str = typer.Option(..., "--name", prompt="Name"),
+    email: str | None = typer.Option(None, "--email"),
+    role: str | None = typer.Option(None, "--role"),
+    source: str | None = typer.Option(None, "--source"),
+) -> None:
+    """Add a contact to a job application."""
+    cid = store_add_contact(
+        paths.db_path(),
+        job_id,
+        name=name,
+        email=email,
+        role=role,
+        source=source,
+    )
+    console.print(f"[green]added[/green] contact {cid} ({name})")
+
+
+@contacts_app.command("list")
+def contacts_list(job_id: int = typer.Argument(...)) -> None:
+    """List contacts for a job application."""
+    rows = store_list_contacts(paths.db_path(), job_id)
+    if not rows:
+        console.print("[dim]no contacts[/dim]")
+        return
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("ID", justify="right")
+    table.add_column("Name")
+    table.add_column("Email")
+    table.add_column("Role")
+    table.add_column("Source")
+    for c in rows:
+        table.add_row(str(c.id), c.name, c.email or "", c.role or "", c.source or "")
+    console.print(table)
+
+
+@contacts_app.command("remove")
+def contacts_remove(contact_id: int = typer.Argument(...)) -> None:
+    """Remove a contact by id."""
+    store_remove_contact(paths.db_path(), contact_id)
+    console.print(f"[green]removed[/green] contact {contact_id}")
