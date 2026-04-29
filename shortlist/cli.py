@@ -16,6 +16,7 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from shortlist import paths
 from shortlist.config import load_prefs
@@ -213,3 +214,36 @@ def rank() -> None:
             fail_count += 1
 
     console.print(f"ranked: {pass_count} pass / {fail_count} filtered")
+
+
+# --- list -----------------------------------------------------------------
+
+
+@app.command("list")
+def list_jobs_cmd(
+    min_score: int = typer.Option(0, "--min-score", help="Hide jobs scoring below."),
+    limit: int = typer.Option(50, "--limit", help="Max rows to print."),
+) -> None:
+    """Print stored jobs as a table, ordered by score DESC."""
+    if not paths.db_path().exists():
+        console.print("[red]error[/red] run `shortlist db init` first")
+        raise typer.Exit(code=2)
+    rows = store_db.list_jobs(paths.db_path(), min_score=min_score, limit=limit)
+    if not rows:
+        console.print("[dim]no jobs[/dim]")
+        return
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Score", justify="right")
+    table.add_column("Company")
+    table.add_column("Title", no_wrap=True)
+    table.add_column("Location")
+    table.add_column("URL", overflow="fold")
+    for j in rows:
+        table.add_row(
+            "—" if j.score is None else str(j.score),
+            j.company,
+            j.title,
+            j.location or "",
+            str(j.url),
+        )
+    console.print(table)

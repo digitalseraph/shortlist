@@ -175,3 +175,39 @@ def test_rank_scores_passing_jobs_high_failing_low(env):
     jobs = list_jobs(data / "db.sqlite")
     scores = sorted(j.score for j in jobs if j.score is not None)
     assert scores == [50, 50]
+
+
+@respx.mock
+def test_list_shows_top_jobs(env):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    (cfg / "prefs.yaml").write_text(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
+            "greenhouse_companies: []",
+            "greenhouse_companies:\n  - acme",
+        )
+    )
+    runner.invoke(app, ["db", "init"])
+    payload = json.loads((FIXTURES / "greenhouse_acme_page1.json").read_text())
+    respx.get(
+        "https://boards-api.greenhouse.io/v1/boards/acme/jobs",
+        params={"content": "true"},
+    ).mock(return_value=httpx.Response(200, json=payload))
+    runner.invoke(app, ["fetch"])
+    runner.invoke(app, ["rank"])
+
+    result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "Senior Backend Engineer" in result.output
+    assert "Acme" in result.output
+
+
+def test_list_min_score_filter(env):
+    cfg, data = env
+    runner.invoke(app, ["config", "init"])
+    runner.invoke(app, ["db", "init"])
+    result = runner.invoke(app, ["list", "--min-score", "1"])
+    # No jobs yet; exit 0, empty table.
+    assert result.exit_code == 0
