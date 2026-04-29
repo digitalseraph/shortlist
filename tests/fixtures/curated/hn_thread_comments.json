@@ -1,0 +1,31 @@
+{
+  "id": 44000001,
+  "type": "story",
+  "title": "Ask HN: Who is hiring? (April 2026)",
+  "children": [
+    {
+      "id": 44000100,
+      "type": "comment",
+      "author": "acme_recruiter",
+      "created_at_i": 1746669600,
+      "text": "<p>Acme Inc | Senior Backend Engineer | Remote (US) | $200-240k<p>We build distributed services in Python. Postgres at scale, Kubernetes everywhere.<p>Apply: <a href=\"https://acme.example/jobs/be\">https://acme.example/jobs/be</a>",
+      "children": []
+    },
+    {
+      "id": 44000101,
+      "type": "comment",
+      "author": "globex_eng",
+      "created_at_i": 1746673200,
+      "text": "<p>Globex | Staff Site Reliability Engineer | Atlanta, GA<p>Multi-region Kubernetes. <a href=\"https://globex.example/sre\">apply here</a>",
+      "children": []
+    },
+    {
+      "id": 44000102,
+      "type": "comment",
+      "author": "lurker",
+      "created_at_i": 1746676800,
+      "text": "<p>Just a regular comment, not a job post.",
+      "children": []
+    }
+  ]
+}
