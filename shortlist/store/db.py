@@ -7,6 +7,7 @@ Every `migrate()` is idempotent.
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from collections.abc import Iterator
@@ -17,7 +18,8 @@ from pathlib import Path
 import numpy as np
 import sqlite_vec  # type: ignore[import-untyped]
 
-from shortlist.models import Job, JobStatus, RawJob
+from shortlist.models import Application, Contact, Job, JobStatus, RawJob
+from shortlist.tracker.state import validate_transition
 
 _MIGRATIONS_DIR = Path(__file__).parent / "_migrations"
 _VERSION_RE = re.compile(r"^(\d{3})_.*\.sql$")
@@ -87,12 +89,13 @@ def _utc_iso(dt: datetime) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _row_to_job(row: sqlite3.Row) -> Job:
-    def _dt(val: str | None) -> datetime | None:
-        if val is None:
-            return None
-        return datetime.fromisoformat(val.replace("Z", "+00:00"))
+def _parse_dt(s: str | None) -> datetime | None:
+    if not s:
+        return None
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
+
+def _row_to_job(row: sqlite3.Row) -> Job:
     return Job(
         id=row["id"],
         source=row["source"],
@@ -110,8 +113,8 @@ def _row_to_job(row: sqlite3.Row) -> Job:
         score=row["score"],
         score_reason=row["score_reason"],
         status=row["status"],
-        status_changed_at=_dt(row["status_changed_at"]),
-        scored_with_prefs_at=_dt(row["scored_with_prefs_at"]),
+        status_changed_at=_parse_dt(row["status_changed_at"]),
+        scored_with_prefs_at=_parse_dt(row["scored_with_prefs_at"]),
         scored_with_model=row["scored_with_model"],
     )
 
@@ -288,3 +291,148 @@ def cosine_top_k(path: Path, query: np.ndarray, *, k: int = 30) -> list[tuple[in
             (query.tobytes(), int(k)),
         ).fetchall()
     return [(int(r["job_id"]), float(r["distance"])) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Application + tracker helpers
+# ---------------------------------------------------------------------------
+
+
+def transition_status(
+    path: Path,
+    job_id: int,
+    target: JobStatus,
+    *,
+    when: datetime | None = None,
+) -> None:
+    """Validate and apply a status transition; record an event."""
+    when = when or datetime.now(UTC)
+    with connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"job {job_id} not found")
+        current: JobStatus = row["status"]
+        validate_transition(current, target)
+        conn.execute(
+            "UPDATE jobs SET status = ?, status_changed_at = ? WHERE id = ?",
+            (target, _utc_iso(when), job_id),
+        )
+        conn.execute(
+            "INSERT INTO events (job_id, type, payload_json, created_at) VALUES (?, ?, ?, ?)",
+            (
+                job_id,
+                "status.transition",
+                json.dumps({"from": current, "to": target}),
+                _utc_iso(when),
+            ),
+        )
+
+
+def update_application(path: Path, job_id: int, **fields: object) -> None:
+    """Upsert the applications row for `job_id`. Only provided fields change."""
+    if not fields:
+        return
+    cols = ", ".join(fields.keys())
+    placeholders = ", ".join("?" for _ in fields)
+    sets = ", ".join(f"{k} = excluded.{k}" for k in fields)
+    values: list[object] = []
+    for v in fields.values():
+        if isinstance(v, datetime):
+            values.append(_utc_iso(v))
+        else:
+            values.append(v)
+    with connect(path) as conn:
+        conn.execute(
+            f"INSERT INTO applications (job_id, {cols}) VALUES (?, {placeholders}) "
+            f"ON CONFLICT (job_id) DO UPDATE SET {sets}",
+            (job_id, *values),
+        )
+
+
+def get_application(path: Path, job_id: int) -> Application | None:
+    """Return the application row for `job_id`, or None if not present."""
+    with connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM applications WHERE job_id = ?", (job_id,)).fetchone()
+    if row is None:
+        return None
+    return Application(
+        job_id=row["job_id"],
+        applied_at=_parse_dt(row["applied_at"]),
+        applied_via=row["applied_via"],
+        follow_up_due=_parse_dt(row["follow_up_due"]),
+        salary_offered=row["salary_offered"],
+        decision=row["decision"],
+        decision_reason=row["decision_reason"],
+        lessons=row["lessons"],
+    )
+
+
+def add_contact(
+    path: Path,
+    application_id: int,
+    *,
+    name: str,
+    email: str | None = None,
+    role: str | None = None,
+    source: str | None = None,
+    when: datetime | None = None,
+) -> int:
+    """Insert a contact row, returning the new id."""
+    when = when or datetime.now(UTC)
+    with connect(path) as conn:
+        cursor = conn.execute(
+            "INSERT INTO contacts (application_id, name, email, role, source, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (application_id, name, email, role, source, _utc_iso(when)),
+        )
+        return int(cursor.lastrowid or 0)
+
+
+def list_contacts(path: Path, application_id: int) -> list[Contact]:
+    """Return contacts for an application, oldest first."""
+    with connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM contacts WHERE application_id = ? ORDER BY created_at",
+            (application_id,),
+        ).fetchall()
+    return [
+        Contact(
+            id=r["id"],
+            application_id=r["application_id"],
+            name=r["name"],
+            email=r["email"],
+            role=r["role"],
+            source=r["source"],
+            created_at=_parse_dt(r["created_at"]) or datetime.now(UTC),
+        )
+        for r in rows
+    ]
+
+
+def remove_contact(path: Path, contact_id: int) -> None:
+    """Delete a contact by id."""
+    with connect(path) as conn:
+        conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
+
+
+def log_event(
+    path: Path,
+    *,
+    job_id: int | None,
+    type: str,  # noqa: A002 - matches column name
+    payload: dict[str, object] | None = None,
+    cost_usd: float | None = None,
+    tokens: int | None = None,
+    when: datetime | None = None,
+) -> None:
+    """Record an event row tied to a job (or global if job_id is None)."""
+    when = when or datetime.now(UTC)
+    with connect(path) as conn:
+        conn.execute(
+            "INSERT INTO events (job_id, type, payload_json, cost_usd, tokens, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (job_id, type, json.dumps(payload or {}), cost_usd, tokens, _utc_iso(when)),
+        )
