@@ -41,7 +41,7 @@ def test_db_status_reports_version(env):
     runner.invoke(app, ["db", "init"])
     result = runner.invoke(app, ["db", "status"])
     assert result.exit_code == 0
-    assert "schema version: 1" in result.output.lower()
+    assert "schema version: 2" in result.output.lower()
 
 
 def test_db_status_when_uninitialized(env):

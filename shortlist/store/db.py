@@ -14,6 +14,8 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
+import sqlite_vec  # type: ignore[import-untyped]
+
 from shortlist.models import Job, JobStatus, RawJob
 
 _MIGRATIONS_DIR = Path(__file__).parent / "_migrations"
@@ -22,9 +24,12 @@ _VERSION_RE = re.compile(r"^(\d{3})_.*\.sql$")
 
 @contextmanager
 def connect(path: Path) -> Iterator[sqlite3.Connection]:
-    """Open a SQLite connection with WAL mode + FK enforcement."""
+    """Open a SQLite connection with sqlite-vec, WAL mode, and FK enforcement."""
     conn = sqlite3.connect(path)
     try:
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA foreign_keys = ON")
         yield conn

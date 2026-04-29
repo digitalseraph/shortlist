@@ -22,14 +22,14 @@ def db_path(tmp_path: Path) -> Path:
 
 def test_migrate_from_zero_to_latest(db_path: Path):
     migrate(db_path)
-    assert current_version(db_path) == 1
+    assert current_version(db_path) == 2
 
 
 def test_migrate_is_idempotent(db_path: Path):
     migrate(db_path)
     migrate(db_path)
     migrate(db_path)
-    assert current_version(db_path) == 1
+    assert current_version(db_path) == 2
 
 
 def test_migrate_creates_jobs_table(db_path: Path):
@@ -143,3 +143,25 @@ def test_update_score(db_path):
     assert out.score == 42
     assert out.score_reason == "hard filter pass"
     assert out.scored_with_model == "hard_filter"
+
+
+def test_migrate_to_v2_creates_embeddings_tables(db_path: Path):
+    migrate(db_path)
+    assert current_version(db_path) == 2
+    with connect(db_path) as conn:
+        names = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table','virtual')"
+            )
+        }
+    assert "job_embeddings" in names
+    assert "resume_embeddings" in names
+    assert "scoring_runs" in names
+
+
+def test_sqlite_vec_extension_loads(db_path: Path):
+    migrate(db_path)
+    with connect(db_path) as conn:
+        row = conn.execute("SELECT vec_version()").fetchone()
+    assert row is not None
