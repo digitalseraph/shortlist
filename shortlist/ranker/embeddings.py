@@ -21,10 +21,16 @@ from shortlist.store.db import connect
 DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
 
 
-def _load_model(name: str = DEFAULT_MODEL) -> Any:
+def _load_model(name: str = DEFAULT_MODEL, *, device: str | None = None) -> Any:
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(name)
+    # Default to CPU. The embedding workload is tiny (a few hundred ~512-token
+    # docs) and a CPU run takes seconds, so the GPU win is marginal at best.
+    # Forcing CPU also sidesteps CUDA / compute-capability mismatches when the
+    # installed torch was built for a newer GPU than the user has.
+    # Override via SHORTLIST_EMBED_DEVICE env var (e.g. "cuda", "mps").
+    chosen = device or os.environ.get("SHORTLIST_EMBED_DEVICE", "cpu")
+    return SentenceTransformer(name, device=chosen)
 
 
 class EmbeddingService:
