@@ -10,6 +10,7 @@ Subcommand groups:
 
 from __future__ import annotations
 
+import importlib.resources as _ir
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -105,6 +106,7 @@ budget:
 paths:
   resume: ~/jobs/resume.md
   output_dir: ~/jobs
+  pdf_template: ~/.config/shortlist/pdf-template.tex
 sources:
   greenhouse:
     enabled: true
@@ -158,6 +160,12 @@ def config_init() -> None:
             console.print(f"[green]wrote[/green] {p}")
     else:
         console.print("[yellow]no changes — both files exist[/yellow]")
+
+    bundled = _ir.files("shortlist.templates").joinpath("pdf-template.tex")
+    target = paths.config_dir() / "pdf-template.tex"
+    if not target.exists():
+        target.write_text(bundled.read_text())
+        console.print(f"[green]wrote[/green] {target}")
 
 
 @config_app.command("show")

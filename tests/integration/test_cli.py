@@ -71,6 +71,7 @@ def test_config_init_writes_default_files(env):
     assert result.exit_code == 0, result.output
     assert (cfg / "config.yaml").exists()
     assert (cfg / "prefs.yaml").exists()
+    assert (cfg / "pdf-template.tex").exists()
 
 
 def test_config_init_does_not_overwrite(env):
