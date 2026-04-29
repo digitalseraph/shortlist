@@ -14,8 +14,8 @@ from bs4 import BeautifulSoup, Tag
 from pydantic import HttpUrl
 
 from shortlist.models import RawJob
+from shortlist.sources._browser import headless_context
 from shortlist.sources.base import Source
-from shortlist.sources.scraped._browser import headless_context
 
 logger = logging.getLogger(__name__)
 

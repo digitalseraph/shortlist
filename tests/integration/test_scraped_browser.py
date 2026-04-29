@@ -1,6 +1,6 @@
 import pytest
 
-from shortlist.sources.scraped._browser import headless_context
+from shortlist.sources._browser import headless_context
 
 
 @pytest.mark.browser
