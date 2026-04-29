@@ -448,3 +448,14 @@ def contacts_remove(contact_id: int = typer.Argument(...)) -> None:
     """Remove a contact by id."""
     store_remove_contact(paths.db_path(), contact_id)
     console.print(f"[green]removed[/green] contact {contact_id}")
+
+
+# --- tui ------------------------------------------------------------------
+
+
+@app.command("tui")
+def tui_cmd() -> None:
+    """Launch the Textual TUI."""
+    from shortlist_tui import run_tui
+
+    run_tui()

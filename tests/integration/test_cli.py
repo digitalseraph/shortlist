@@ -438,3 +438,9 @@ def test_contacts_add_list_remove(env, tmp_path):
     result = runner.invoke(app, ["contacts", "list", str(j.id)])
     assert "Jane Doe" in result.output
     assert "jane@acme.com" in result.output
+
+
+def test_cli_tui_help_does_not_error(env):
+    result = runner.invoke(app, ["tui", "--help"])
+    assert result.exit_code == 0
+    assert "TUI" in result.output or "tui" in result.output.lower()
