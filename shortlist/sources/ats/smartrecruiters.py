@@ -28,6 +28,7 @@ from tenacity import (
 )
 
 from shortlist.models import RawJob
+from shortlist.sources._comp import parse_comp_from_text
 from shortlist.sources.base import Source
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ def _normalize(job: dict[str, Any], *, company: str) -> RawJob:
         if text:
             parts.append(_strip_html(text))
     description_md = "\n\n".join(parts) or None
+    comp_min, comp_max = parse_comp_from_text(description_md) if description_md else (None, None)
     return RawJob(
         source="smartrecruiters",
         external_id=str(job["id"]),
@@ -59,6 +61,8 @@ def _normalize(job: dict[str, Any], *, company: str) -> RawJob:
         posted_at=datetime.fromisoformat(job["releasedDate"].replace("Z", "+00:00")),
         location=location or None,
         remote=bool(loc.get("remote")),
+        comp_min=comp_min,
+        comp_max=comp_max,
         description_md=description_md,
     )
 

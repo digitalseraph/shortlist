@@ -24,6 +24,7 @@ from tenacity import (
 )
 
 from shortlist.models import RawJob
+from shortlist.sources._comp import parse_comp_from_text
 from shortlist.sources.base import Source
 
 logger = logging.getLogger(__name__)
@@ -35,9 +36,27 @@ def _is_remote(loc: str) -> bool:
     return "remote" in loc.lower()
 
 
+def _extract_lever_comp(posting: dict[str, Any]) -> tuple[int | None, int | None]:
+    """Lever has an optional structured `salaryRange: {min, max, currency}`."""
+    sr = posting.get("salaryRange") or {}
+    raw_min = sr.get("min")
+    raw_max = sr.get("max")
+    if isinstance(raw_min, int | float) and isinstance(raw_max, int | float):
+        return int(raw_min), int(raw_max)
+    if isinstance(raw_min, int | float):
+        return int(raw_min), None
+    if isinstance(raw_max, int | float):
+        return None, int(raw_max)
+    return None, None
+
+
 def _normalize(posting: dict[str, Any], *, company: str) -> RawJob:
     cats = posting.get("categories") or {}
     location = cats.get("location") or ""
+    description = (posting.get("descriptionPlain") or "").strip() or None
+    comp_min, comp_max = _extract_lever_comp(posting)
+    if comp_min is None and comp_max is None and description:
+        comp_min, comp_max = parse_comp_from_text(description)
     return RawJob(
         source="lever",
         external_id=str(posting["id"]),
@@ -47,7 +66,9 @@ def _normalize(posting: dict[str, Any], *, company: str) -> RawJob:
         posted_at=datetime.fromtimestamp(int(posting["createdAt"]) / 1000, tz=UTC),
         location=location or None,
         remote=_is_remote(location),
-        description_md=(posting.get("descriptionPlain") or "").strip() or None,
+        comp_min=comp_min,
+        comp_max=comp_max,
+        description_md=description,
     )
 
 

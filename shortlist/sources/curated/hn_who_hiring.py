@@ -19,6 +19,7 @@ import httpx
 from pydantic import HttpUrl
 
 from shortlist.models import RawJob
+from shortlist.sources._comp import parse_comp_from_text
 from shortlist.sources.base import Source
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,9 @@ def parse_comment(comment: dict[str, Any]) -> RawJob | None:
     link_m = _LINK_RE.search(text_html)
     url = link_m.group(0) if link_m else f"https://news.ycombinator.com/item?id={comment['id']}"
     posted_at = datetime.fromtimestamp(int(comment.get("created_at_i") or 0), tz=UTC)
+    # First line often contains "Company | Title | Location | $200k-240k".
+    # Search the whole comment so postings that put comp in body still match.
+    comp_min, comp_max = parse_comp_from_text(text)
     return RawJob(
         source="hn_who_hiring",
         external_id=str(comment["id"]),
@@ -73,6 +77,8 @@ def parse_comment(comment: dict[str, Any]) -> RawJob | None:
         posted_at=posted_at,
         location=location or None,
         remote=is_remote,
+        comp_min=comp_min,
+        comp_max=comp_max,
         description_md=text[:2000],
     )
 

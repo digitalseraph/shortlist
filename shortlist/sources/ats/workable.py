@@ -24,6 +24,7 @@ from tenacity import (
 )
 
 from shortlist.models import RawJob
+from shortlist.sources._comp import parse_comp_from_text
 from shortlist.sources.base import Source
 
 logger = logging.getLogger(__name__)
@@ -40,12 +41,29 @@ def _is_remote(loc: str) -> bool:
     return "remote" in loc.lower()
 
 
+def _extract_workable_comp(job: dict[str, Any]) -> tuple[int | None, int | None]:
+    """Workable optionally provides `salary: {min, max, currency}`."""
+    salary = job.get("salary") or {}
+    raw_min = salary.get("min")
+    raw_max = salary.get("max")
+    if isinstance(raw_min, int | float) and isinstance(raw_max, int | float):
+        return int(raw_min), int(raw_max)
+    if isinstance(raw_min, int | float):
+        return int(raw_min), None
+    if isinstance(raw_max, int | float):
+        return None, int(raw_max)
+    return None, None
+
+
 def _normalize(job: dict[str, Any], *, company: str) -> RawJob:
     loc_obj = job.get("location") or {}
     location = loc_obj.get("location_str") or ""
     desc = _strip_html(job.get("description") or "")
     reqs = _strip_html(job.get("requirements") or "")
     description_md = "\n\n".join(p for p in (desc, reqs) if p) or None
+    comp_min, comp_max = _extract_workable_comp(job)
+    if comp_min is None and comp_max is None and description_md:
+        comp_min, comp_max = parse_comp_from_text(description_md)
     return RawJob(
         source="workable",
         external_id=str(job["shortcode"]),
@@ -55,6 +73,8 @@ def _normalize(job: dict[str, Any], *, company: str) -> RawJob:
         posted_at=datetime.fromisoformat(job["posted_date"]).replace(tzinfo=UTC),
         location=location or None,
         remote=_is_remote(location),
+        comp_min=comp_min,
+        comp_max=comp_max,
         description_md=description_md,
     )
 
