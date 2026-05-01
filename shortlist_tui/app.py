@@ -82,27 +82,37 @@ class ShortlistApp(App[None]):
 
     @work(thread=True, exclusive=True, group="tailor")
     def _tailor_worker(self, job_id: int) -> None:
-        cfg = load_config(paths.config_path())
-        prefs = load_prefs(paths.prefs_path())
-        resume = cfg.paths.resume.expanduser()
-        key = os.environ.get(cfg.anthropic.key_env_var, "")
-        if not key:
-            self.notify("ANTHROPIC_API_KEY not set", severity="error")
-            return
-        from anthropic import Anthropic
+        try:
+            cfg = load_config(paths.config_path())
+            prefs = load_prefs(paths.prefs_path())
+            resume = cfg.paths.resume.expanduser()
+            if not resume.exists():
+                self.notify(
+                    f"resume not found at {resume}", severity="error", timeout=8
+                )
+                return
+            key = os.environ.get(cfg.anthropic.key_env_var, "")
+            if not key:
+                self.notify(
+                    f"{cfg.anthropic.key_env_var} not set", severity="error", timeout=8
+                )
+                return
+            from anthropic import Anthropic
 
-        msg = tailor_one(
-            self._db_path,
-            job_id,
-            cfg=cfg,
-            prefs=prefs,
-            resume_path=resume,
-            anthropic_client=Anthropic(api_key=key),
-        )
-        self.notify(msg, severity="information")
-        screen = self.screen_stack[-1]
-        if hasattr(screen, "_reload"):
-            self.call_from_thread(screen._reload)
+            msg = tailor_one(
+                self._db_path,
+                job_id,
+                cfg=cfg,
+                prefs=prefs,
+                resume_path=resume,
+                anthropic_client=Anthropic(api_key=key),
+            )
+            self.notify(msg, severity="information")
+            screen = self.screen_stack[-1]
+            if hasattr(screen, "_reload"):
+                self.call_from_thread(screen._reload)
+        except Exception as e:  # noqa: BLE001 — surface in TUI
+            self.notify(f"tailor failed: {e}", severity="error", timeout=10)
 
     def action_fetch(self) -> None:
         self.notify("fetching…")

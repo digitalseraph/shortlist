@@ -117,8 +117,10 @@ class JobListScreen(Screen[None]):
     def action_tailor(self) -> None:
         table = self.query_one(DataTable)
         if table.cursor_row < 0 or table.cursor_row >= len(self._rows):
+            self.app.notify("no row selected", severity="warning")
             return
         row = self._rows[table.cursor_row]
+        self.app.notify(f"tailoring job {row.id} ({row.company})…")
         self.app._tailor_worker(row.id)  # type: ignore[attr-defined]
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
