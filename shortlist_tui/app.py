@@ -87,15 +87,11 @@ class ShortlistApp(App[None]):
             prefs = load_prefs(paths.prefs_path())
             resume = cfg.paths.resume.expanduser()
             if not resume.exists():
-                self.notify(
-                    f"resume not found at {resume}", severity="error", timeout=8
-                )
+                self.notify(f"resume not found at {resume}", severity="error", timeout=8)
                 return
             key = os.environ.get(cfg.anthropic.key_env_var, "")
             if not key:
-                self.notify(
-                    f"{cfg.anthropic.key_env_var} not set", severity="error", timeout=8
-                )
+                self.notify(f"{cfg.anthropic.key_env_var} not set", severity="error", timeout=8)
                 return
             from anthropic import Anthropic
 
