@@ -27,6 +27,12 @@
       hx-include="[name='q'],[name='max_age_days']"
     >
   </label>
+  <button
+    hx-post="/rank/selected"
+    hx-include=".job-select:checked"
+    hx-target="#toast"
+    hx-swap="innerHTML"
+    title="LLM rerank the checked jobs — costs $$">Rank Selected (LLM)</button>
   <label>
     posted within
     <select
@@ -52,4 +58,17 @@
 </div>
 
 {% include "_joblist_table.html" %}
+
+<script>
+  // Select-all checkbox toggles every visible row checkbox. Re-bind on HTMX swap.
+  function bindSelectAll() {
+    const all = document.getElementById('select-all');
+    if (!all) return;
+    all.addEventListener('change', () => {
+      document.querySelectorAll('.job-select').forEach(cb => { cb.checked = all.checked; });
+    });
+  }
+  bindSelectAll();
+  document.body.addEventListener('htmx:afterSwap', bindSelectAll);
+</script>
 {% endblock %}

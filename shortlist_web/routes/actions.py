@@ -6,13 +6,13 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader
 
 from shortlist import paths
 from shortlist.config import load_config, load_prefs
-from shortlist_tui.workers import fetch_all, rank_all, tailor_one
+from shortlist_tui.workers import fetch_all, rank_all, rerank_selected, tailor_one
 
 router = APIRouter()
 
@@ -57,6 +57,29 @@ def _run_rank(app: Any, db_path: Path, cfg: Any, prefs: Any, resume: Path, clien
         _append_log(app, f"rank: {result}")
     except Exception as exc:  # noqa: BLE001
         _append_log(app, f"rank error: {exc}")
+
+
+def _run_rerank_selected(
+    app: Any,
+    db_path: Path,
+    job_ids: list[int],
+    cfg: Any,
+    prefs: Any,
+    resume: Path,
+    client: Any,
+) -> None:
+    try:
+        result = rerank_selected(
+            db_path,
+            job_ids,
+            cfg=cfg,
+            prefs=prefs,
+            resume_path=resume,
+            anthropic_client=client,
+        )
+        _append_log(app, f"rerank: {result}")
+    except Exception as exc:  # noqa: BLE001
+        _append_log(app, f"rerank error: {exc}")
 
 
 def _run_tailor(
@@ -108,6 +131,38 @@ def rank(
     background.add_task(_run_rank, request.app, paths.db_path(), cfg, prefs, resume, client)
     label = "rank started (LLM)" if client else "rank started (cosine only)"
     return _toast(request, label, "info")
+
+
+@router.post("/rank/selected", response_class=HTMLResponse)
+def rank_selected(
+    background: BackgroundTasks,
+    request: Request,
+    job_ids: list[int] = Form(default=[]),
+) -> HTMLResponse:
+    """LLM-rerank the user's checkbox selection from the job list."""
+    if not job_ids:
+        return _toast(request, "no jobs selected", "error", code=400)
+    cfg = load_config(paths.config_path())
+    prefs = load_prefs(paths.prefs_path())
+    resume = cfg.paths.resume.expanduser()
+    if not resume.exists():
+        return _toast(request, f"resume not found at {resume}", "error", code=400)
+    key = os.environ.get(cfg.anthropic.key_env_var, "")
+    if not key:
+        return _toast(request, f"{cfg.anthropic.key_env_var} not set", "error", code=400)
+    from anthropic import Anthropic
+
+    background.add_task(
+        _run_rerank_selected,
+        request.app,
+        paths.db_path(),
+        list(job_ids),
+        cfg,
+        prefs,
+        resume,
+        Anthropic(api_key=key),
+    )
+    return _toast(request, f"reranking {len(job_ids)} job(s)…", "info")
 
 
 @router.post("/tailor/{job_id}", response_class=HTMLResponse)

@@ -18,9 +18,7 @@
     <div class="actions">
       <button hx-post="/fetch" hx-target="#toast" hx-swap="innerHTML">Fetch</button>
       <button hx-post="/rank?mode=no-llm" hx-target="#toast" hx-swap="innerHTML"
-              title="cosine similarity only — free">Rank</button>
-      <button hx-post="/rank?mode=llm" hx-target="#toast" hx-swap="innerHTML"
-              title="cosine + Claude rerank — costs $$">Rank (LLM)</button>
+              title="cosine score every job — free">Rank All</button>
     </div>
   </header>
   <div id="toast"></div>

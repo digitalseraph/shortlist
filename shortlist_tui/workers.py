@@ -14,7 +14,7 @@ from typing import Any
 from shortlist.config import Config, Prefs
 from shortlist.ranker.embeddings import EmbeddingService
 from shortlist.ranker.llm_rerank import LLMReranker
-from shortlist.ranker.pipeline import run_pipeline
+from shortlist.ranker.pipeline import rerank_jobs, run_pipeline
 from shortlist.sources.ats.ashby import AshbySource
 from shortlist.sources.ats.greenhouse import GreenhouseSource
 from shortlist.sources.ats.lever import LeverSource
@@ -131,6 +131,30 @@ def rank_all(
     return (
         f"filtered={summary.filtered} | top_k={summary.cosine_top_k} | "
         f"llm={summary.llm_scored} | cost=${summary.cost_usd:.4f}"
+    )
+
+
+def rerank_selected(
+    db_path: Path,
+    job_ids: list[int],
+    *,
+    cfg: Config,
+    prefs: Prefs,
+    resume_path: Path,
+    anthropic_client: Any,
+) -> str:
+    """LLM rerank a specific list of job IDs. Caller supplies a real client."""
+    reranker = LLMReranker(client=anthropic_client, model=cfg.ranker.rerank_model)
+    summary = rerank_jobs(
+        db_path,
+        job_ids,
+        prefs=prefs,
+        resume_path=resume_path,
+        reranker=reranker,
+    )
+    return (
+        f"reranked {summary.scored}/{summary.requested} | "
+        f"cost=${summary.cost_usd:.4f} | tokens={summary.tokens_in}/{summary.tokens_out}"
     )
 
 

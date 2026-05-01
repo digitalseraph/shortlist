@@ -107,6 +107,8 @@ h2 { font-size: 1rem; margin-bottom: 0.5rem; }
 .job-table th.sortable a:hover { background: rgba(0, 0, 0, 0.05); }
 .job-table th.sort-active a { color: #06c; }
 
+td.select, th.select { width: 1.5rem; text-align: center; padding: 0.4rem 0.3rem; }
+.job-select { cursor: pointer; }
 td.score { text-align: right; font-variant-numeric: tabular-nums; min-width: 3rem; }
 td.comp  { text-align: right; white-space: nowrap; }
 td.dim   { color: var(--dim); }
