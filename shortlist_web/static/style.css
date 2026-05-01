@@ -1,0 +1,179 @@
+/* Shortlist web UI — minimal system-font stylesheet */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --bg: #f8f9fa;
+  --surface: #ffffff;
+  --border: #dee2e6;
+  --text: #212529;
+  --dim: #6c757d;
+  --accent: #0d6efd;
+  --danger: #dc3545;
+  --radius: 6px;
+  --gap: 1rem;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem var(--gap);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+nav { display: flex; gap: 1.25rem; }
+nav a { color: var(--accent); text-decoration: none; font-weight: 500; }
+nav a:hover { text-decoration: underline; }
+
+.actions { display: flex; gap: 0.5rem; }
+
+/* ── Buttons ── */
+button, input[type="submit"] {
+  cursor: pointer;
+  font: inherit;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  white-space: nowrap;
+}
+button:hover { background: var(--bg); }
+
+/* ── Main ── */
+main { padding: var(--gap); max-width: 1400px; margin: 0 auto; }
+
+h1 { font-size: 1.25rem; margin-bottom: var(--gap); }
+h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+
+/* ── Toast + status feed ── */
+#toast { padding: 0 var(--gap); }
+.toast { padding: 0.4rem 0.75rem; border-radius: var(--radius); margin: 0.25rem 0; font-size: 0.85rem; }
+.toast.info  { background: #cfe2ff; color: #084298; }
+.toast.error { background: #f8d7da; color: #842029; }
+
+#status-feed { padding: 0 var(--gap); }
+.status-log { list-style: none; font-size: 0.8rem; color: var(--dim); }
+.status-log li::before { content: "› "; }
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+}
+.toolbar input[type="search"] {
+  flex: 1;
+  max-width: 360px;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+/* ── Job table ── */
+.job-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.job-table th, .job-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.job-table th { font-weight: 600; background: var(--bg); }
+.job-table tr:hover td { background: #f1f3f5; }
+
+td.score { text-align: right; font-variant-numeric: tabular-nums; min-width: 3rem; }
+td.comp  { text-align: right; white-space: nowrap; }
+td.dim   { color: var(--dim); }
+
+/* ── Status badges ── */
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--border);
+  color: var(--text);
+}
+.status-new       { background: #e2e3e5; }
+.status-tailored  { background: #cff4fc; color: #055160; }
+.status-applied   { background: #cfe2ff; color: #084298; }
+.status-screen    { background: #fff3cd; color: #664d03; }
+.status-interview { background: #d1e7dd; color: #0a3622; }
+.status-offer     { background: #d1e7dd; color: #0a3622; font-weight: 700; }
+.status-rejected  { background: #f8d7da; color: #842029; }
+.status-withdrawn { background: #e2e3e5; color: var(--dim); }
+
+/* ── Job detail ── */
+.job-detail { max-width: 860px; }
+.meta { margin-bottom: var(--gap); }
+.track-form { display: flex; align-items: center; gap: 0.5rem; margin-bottom: var(--gap); }
+details { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: var(--gap); }
+summary { padding: 0.5rem 0.75rem; cursor: pointer; font-weight: 600; }
+.jd-body  { padding: 0.75rem; white-space: pre-wrap; font-family: var(--mono); font-size: 0.8rem; }
+.material { padding: 0.75rem; font-family: var(--mono); font-size: 0.8rem; white-space: pre-wrap; overflow-x: auto; }
+
+/* ── Kanban ── */
+.kanban { display: flex; gap: var(--gap); overflow-x: auto; align-items: flex-start; }
+.kanban-col {
+  flex: 0 0 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+.kanban-col h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--dim); }
+.count { font-weight: 400; }
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+}
+.card a { color: var(--text); text-decoration: none; }
+.card a:hover { color: var(--accent); }
+.card p { margin-top: 0.2rem; }
+
+/* ── Settings ── */
+.settings-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--gap);
+  margin-bottom: var(--gap);
+  max-width: 800px;
+}
+.settings-section h2 { margin-bottom: 0.5rem; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; font-size: 0.875rem; }
+dt { font-weight: 600; color: var(--dim); }
+dd { font-family: var(--mono); word-break: break-all; }
+
+/* ── Utilities ── */
+.dim   { color: var(--dim); }
+.error { color: var(--danger); }
+.empty { color: var(--dim); font-style: italic; margin-top: 0.5rem; }
+a { color: var(--accent); }

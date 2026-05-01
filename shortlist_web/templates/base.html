@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Shortlist{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="/">Jobs</a>
+      <a href="/applications">Applications</a>
+      <a href="/settings">Settings</a>
+    </nav>
+    <div class="actions">
+      <button hx-post="/fetch" hx-target="#toast" hx-swap="innerHTML">Fetch</button>
+      <button hx-post="/rank" hx-target="#toast" hx-swap="innerHTML">Rank</button>
+    </div>
+  </header>
+  <div id="toast"></div>
+  <div id="status-feed" hx-get="/status" hx-trigger="every 5s" hx-swap="innerHTML"></div>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

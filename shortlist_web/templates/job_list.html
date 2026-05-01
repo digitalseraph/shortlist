@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Jobs — Shortlist{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <input
+    type="search"
+    name="q"
+    value="{{ q }}"
+    placeholder="filter by company or title…"
+    hx-get="/"
+    hx-trigger="keyup changed delay:300ms"
+    hx-target="#job-tbody"
+    hx-swap="innerHTML"
+    hx-include="[name='min_score']"
+  >
+  <label>
+    min score
+    <input
+      type="number"
+      name="min_score"
+      value="{{ min_score }}"
+      min="0" max="100" size="4"
+      hx-get="/"
+      hx-trigger="change"
+      hx-target="#job-tbody"
+      hx-swap="innerHTML"
+      hx-include="[name='q']"
+    >
+  </label>
+</div>
+
+<table class="job-table">
+  <thead>
+    <tr>
+      <th>Score</th>
+      <th>Company</th>
+      <th>Title</th>
+      <th>Location</th>
+      <th>Comp</th>
+      <th>Status</th>
+      <th colspan="2"></th>
+    </tr>
+  </thead>
+  <tbody id="job-tbody">
+    {% for row in rows %}
+    {% include "_job_row.html" %}
+    {% endfor %}
+  </tbody>
+</table>
+{% if not rows %}
+<p class="empty">No jobs found. Click <strong>Fetch</strong> to pull from sources.</p>
+{% endif %}
+{% endblock %}

@@ -22,6 +22,10 @@ dependencies = [
     "playwright>=1.45",
     "beautifulsoup4>=4.12",
     "feedparser>=6.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.18",
 ]
 
 [project.optional-dependencies]
@@ -45,10 +49,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["shortlist", "shortlist_tui"]
+packages = ["shortlist", "shortlist_tui", "shortlist_web"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "shortlist/templates/pdf-template.tex" = "shortlist/templates/pdf-template.tex"
+"shortlist_web/templates" = "shortlist_web/templates"
+"shortlist_web/static" = "shortlist_web/static"
 
 [tool.ruff]
 line-length = 100
@@ -60,7 +66,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["shortlist", "shortlist_tui"]
+files = ["shortlist", "shortlist_tui", "shortlist_web"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

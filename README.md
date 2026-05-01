@@ -47,7 +47,33 @@ shortlist tailor <job_id>                      # Sonnet: resume.md + cover.md + 
 shortlist track <job_id> --status applied --applied-via "company website"
 shortlist contacts add <job_id> --name "Jane Doe" --email jane@acme.com --role recruiter
 shortlist tui                                  # browse everything in the TUI
+shortlist web                                  # launch browser UI at http://127.0.0.1:8765
 ```
+
+## Web UI
+
+`shortlist web` launches a server-rendered browser interface (FastAPI + HTMX) on
+`http://127.0.0.1:8765` by default. No Node, no build step — just `pip install` and go.
+
+```bash
+shortlist web                        # default: 127.0.0.1:8765
+shortlist web --port 9000            # custom port
+shortlist web --host 0.0.0.0         # expose on LAN (single-user only — no auth)
+```
+
+Pages mirror the TUI:
+
+| Page | URL | What it shows |
+|------|-----|---------------|
+| Jobs | `/` | Scored job table with live search filter and per-row Tailor button |
+| Job detail | `/job/{id}` | Full JD, tailored resume/cover/notes previews, status tracker |
+| Applications | `/applications` | Kanban columns by status (tailored → offer / rejected) |
+| Settings | `/settings` | Read-only view of config.yaml, prefs.yaml, and data paths |
+
+Global **Fetch** and **Rank** buttons in the header dispatch background tasks and report
+results in a polling status strip at the top of every page. The `shortlist web` command
+is a thin wrapper — all job logic runs through the same `shortlist_tui.workers` path
+used by the TUI.
 
 ## Sources
 

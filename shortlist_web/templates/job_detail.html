@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ job.company }} — {{ job.title }} — Shortlist{% endblock %}
+{% block content %}
+<div class="job-detail">
+  <h1>{{ job.company }} — {{ job.title }}</h1>
+  <p class="meta dim">
+    {{ job.location or "—" }} ·
+    score {{ job.score if job.score is not none else "—" }} ·
+    <span class="badge status-{{ job.status }}">{{ job.status }}</span> ·
+    <a href="{{ job.url }}" target="_blank" rel="noopener">open posting</a>
+  </p>
+
+  {% if allowed_next %}
+  <form method="post" action="/track/{{ job.id }}" class="track-form">
+    <label>
+      move to
+      <select name="status">
+        {% for s in allowed_next %}
+        <option value="{{ s }}">{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Track</button>
+  </form>
+  {% endif %}
+
+  <details open>
+    <summary>Job description</summary>
+    <div class="jd-body">{{ job.description_md | safe }}</div>
+  </details>
+
+  {% if materials %}
+    {% if materials.get('resume') %}
+    <details>
+      <summary>Tailored resume</summary>
+      <pre class="material">{{ materials['resume'] }}</pre>
+    </details>
+    {% endif %}
+    {% if materials.get('cover') %}
+    <details>
+      <summary>Cover letter</summary>
+      <pre class="material">{{ materials['cover'] }}</pre>
+    </details>
+    {% endif %}
+    {% if materials.get('notes') %}
+    <details>
+      <summary>Notes</summary>
+      <pre class="material">{{ materials['notes'] }}</pre>
+    </details>
+    {% endif %}
+  {% else %}
+  <p class="dim">No tailored materials yet. Click <strong>Tailor</strong> on the jobs list to generate.</p>
+  {% endif %}
+</div>
+{% endblock %}

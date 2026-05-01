@@ -579,3 +579,14 @@ def tui_cmd() -> None:
     from shortlist_tui import run_tui
 
     run_tui()
+
+
+@app.command("web")
+def web_cmd(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8765, "--port"),
+) -> None:
+    """Launch the web UI on http://host:port (default 127.0.0.1:8765)."""
+    from shortlist_web import run_web
+
+    run_web(host=host, port=port)

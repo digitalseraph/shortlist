@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Applications — Shortlist{% endblock %}
+{% block content %}
+<h1>Applications</h1>
+<div class="kanban">
+  {% for col in columns %}
+  <section class="kanban-col">
+    <h2>{{ col }} <span class="count">({{ by_status[col] | length }})</span></h2>
+    {% for row in by_status[col] %}
+    <article class="card">
+      <a href="/job/{{ row.id }}"><strong>{{ row.company }}</strong> — {{ row.title }}</a>
+      <p class="dim">{{ row.location }}{% if row.comp_display != "—" %} · {{ row.comp_display }}{% endif %}</p>
+    </article>
+    {% else %}
+    <p class="empty dim">—</p>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}
