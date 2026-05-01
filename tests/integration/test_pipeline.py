@@ -109,9 +109,12 @@ def test_pipeline_filters_then_cosine_then_llm(tmp_path, fake_embedder):
     assert summary.cost_usd > 0
 
     jobs = list_jobs(db)
-    scored = {j.title: j.score for j in jobs}
-    assert scored["C++ Engineer"] == 0
-    assert all(j.score is not None for j in jobs if j.title != "C++ Engineer")
+    # Every job — including filtered — gets a cosine score 0..100; filtered
+    # jobs have their reason prefixed with "(filtered) ".
+    assert all(j.score is not None for j in jobs)
+    cpp = next(j for j in jobs if j.title == "C++ Engineer")
+    assert cpp.score is not None
+    assert (cpp.score_reason or "").startswith("(filtered)")
 
 
 def test_pipeline_no_llm_path(tmp_path, fake_embedder):

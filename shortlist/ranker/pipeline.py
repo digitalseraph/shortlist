@@ -1,12 +1,15 @@
 """End-to-end ranking pipeline.
 
-Stage 1: hard filter — drop jobs that obviously don't match prefs.
-Stage 2: cosine score — embed surviving jobs, score every survivor 0–100 by
-         cosine similarity against the resume embedding.
-Stage 3 (optional): Haiku rerank — for the top-K cosine survivors, let an LLM
-         produce a final 0–100 + one-line reason, overwriting the cosine score.
-
-Filtered-out jobs always get score 0 + reason "filtered".
+Stage 1: embed + cosine score — embed every job and assign a 0–100 cosine
+         similarity score against the resume embedding. Every job in the
+         store gets a score so the user can browse the full list.
+Stage 2: hard filter annotation — jobs failing prefs (wrong title/seniority/
+         location/excluded keyword) get their score reason prefixed with
+         "(filtered) " but keep their cosine score. The filter still gates
+         which jobs are eligible for LLM rerank.
+Stage 3 (optional): Haiku rerank — for the top-K cosine *survivors*, let an
+         LLM produce a final 0–100 + one-line reason, overwriting the cosine
+         score for those jobs only.
 
 `rerank_jobs` is a separate entry point for re-running the LLM stage on an
 explicit list of job IDs (used by the web "Rank Selected (LLM)" button).
@@ -38,6 +41,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class PipelineSummary:
     filtered: int
+    cosine_scored: int
     cosine_top_k: int
     llm_scored: int
     cost_usd: float
@@ -86,48 +90,45 @@ def run_pipeline(
     reranker: LLMReranker | None,
     top_k: int = 30,
 ) -> PipelineSummary:
-    """Score every job in the store. Returns a summary."""
+    """Cosine-score every job, optionally LLM-rerank the top-K survivors."""
     all_jobs = store_db.list_jobs(db_path)
+    if not all_jobs:
+        return PipelineSummary(0, 0, 0, 0, 0.0)
 
-    # Stage 1: hard filter.
-    filtered_out: list[Job] = []
-    survivors: list[Job] = []
-    for job in all_jobs:
-        if passes(job, prefs):
-            survivors.append(job)
-        else:
-            filtered_out.append(job)
-            store_db.update_score(
-                db_path, job.id, score=0, reason="filtered out", model="hard_filter"
-            )
+    survivor_ids = {j.id for j in all_jobs if passes(j, prefs)}
+    filtered_count = len(all_jobs) - len(survivor_ids)
 
-    if not survivors:
-        return PipelineSummary(len(filtered_out), 0, 0, 0.0)
-
-    # Stage 2: embed survivors and cosine-score every one of them.
+    # Stage 1: embed every job and cosine-score every one of them.
     resume_vec = embed_resume_cached(db_path, resume_path, service=embedder)
-    for job in survivors:
+    for job in all_jobs:
         if store_db.get_embedding(db_path, job.id) is None:
             text = f"{job.title}\n\n{job.description_md or ''}"
             store_db.upsert_embedding(db_path, job.id, embedder.encode(text))
 
-    # Pull every survivor's distance to the resume vector in one query.
-    ranked = store_db.cosine_top_k(db_path, resume_vec, k=len(survivors))
+    ranked = store_db.cosine_top_k(db_path, resume_vec, k=len(all_jobs))
     distance_by_id = {jid: dist for (jid, dist) in ranked}
-    for j in survivors:
+    for j in all_jobs:
         dist = distance_by_id.get(j.id)
         score = _distance_to_score(dist) if dist is not None else 0
+        prefix = "" if j.id in survivor_ids else "(filtered) "
         store_db.update_score(
             db_path,
             j.id,
             score=score,
-            reason=f"cosine sim ({score}/100)",
+            reason=f"{prefix}cosine sim ({score}/100)",
             model="cosine_only",
         )
 
-    # Pick the top-K survivors by cosine for optional LLM rerank.
-    top_ids = {jid for (jid, _d) in ranked[:top_k]}
-    top_jobs = [j for j in survivors if j.id in top_ids]
+    # Pick the top-K survivors (filter-passing) by cosine for LLM rerank.
+    top_jobs: list[Job] = []
+    for jid, _d in ranked:
+        if jid in survivor_ids:
+            for j in all_jobs:
+                if j.id == jid:
+                    top_jobs.append(j)
+                    break
+            if len(top_jobs) >= top_k:
+                break
 
     # Stage 3: LLM rerank (if reranker provided) — overwrites cosine scores.
     cost = 0.0
@@ -173,14 +174,20 @@ def run_pipeline(
                 store_db._utc_iso(datetime.now(UTC)),
                 store_db._utc_iso(datetime.now(UTC)),
                 "claude-haiku-4-5" if reranker else "cosine_only",
-                len(survivors),
+                len(all_jobs),
                 cost,
                 tokens_in,
                 tokens_out,
             ),
         )
 
-    return PipelineSummary(len(filtered_out), len(top_jobs), llm_scored, cost)
+    return PipelineSummary(
+        filtered=filtered_count,
+        cosine_scored=len(all_jobs),
+        cosine_top_k=len(top_jobs),
+        llm_scored=llm_scored,
+        cost_usd=cost,
+    )
 
 
 @dataclass(frozen=True)

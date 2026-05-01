@@ -129,8 +129,9 @@ def rank_all(
         top_k=top_k,
     )
     return (
-        f"filtered={summary.filtered} | top_k={summary.cosine_top_k} | "
-        f"llm={summary.llm_scored} | cost=${summary.cost_usd:.4f}"
+        f"cosine_scored={summary.cosine_scored} | filtered={summary.filtered} | "
+        f"llm_top_k={summary.cosine_top_k} | llm={summary.llm_scored} | "
+        f"cost=${summary.cost_usd:.4f}"
     )
 
 
