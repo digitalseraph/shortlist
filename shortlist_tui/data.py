@@ -66,6 +66,7 @@ class JobRow:
     comp_min: int | None = None
     comp_max: int | None = None
     posted_at: datetime | None = None
+    remote: bool = False
 
     @property
     def score_display(self) -> str:
@@ -111,6 +112,7 @@ def list_job_rows(
             comp_min=j.comp_min,
             comp_max=j.comp_max,
             posted_at=j.posted_at,
+            remote=bool(j.remote),
         )
         for j in jobs
     ]

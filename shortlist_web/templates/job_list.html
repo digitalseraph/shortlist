@@ -11,7 +11,7 @@
     hx-trigger="keyup changed delay:300ms"
     hx-target="#job-tbody"
     hx-swap="innerHTML"
-    hx-include="[name='min_score'],[name='max_age_days']"
+    hx-include="[name='min_score'],[name='max_age_days'],[name='remote_only']"
   >
   <label>
     min score
@@ -24,8 +24,22 @@
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"
-      hx-include="[name='q'],[name='max_age_days']"
+      hx-include="[name='q'],[name='max_age_days'],[name='remote_only']"
     >
+  </label>
+  <label>
+    <input
+      type="checkbox"
+      name="remote_only"
+      value="true"
+      {% if remote_only %}checked{% endif %}
+      hx-get="/"
+      hx-trigger="change"
+      hx-target="#job-tbody"
+      hx-swap="innerHTML"
+      hx-include="[name='q'],[name='min_score'],[name='max_age_days']"
+    >
+    remote only
   </label>
   <button
     hx-post="/rank/selected"
@@ -41,7 +55,7 @@
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"
-      hx-include="[name='q'],[name='min_score']"
+      hx-include="[name='q'],[name='min_score'],[name='remote_only']"
     >
       {% for choice in max_age_choices %}
       <option value="{{ choice }}" {% if choice == max_age_days %}selected{% endif %}>

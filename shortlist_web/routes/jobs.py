@@ -63,6 +63,7 @@ def job_list(
     q: str | None = None,
     min_score: int = 0,
     max_age_days: int = 365,
+    remote_only: bool = False,
     sort: str = "score",
     dir: str = "desc",  # noqa: A002 — matches HTMX query name
 ) -> HTMLResponse:
@@ -80,6 +81,8 @@ def job_list(
     if q:
         ql = q.lower()
         rows = [r for r in rows if ql in r.company.lower() or ql in r.title.lower()]
+    if remote_only:
+        rows = [r for r in rows if r.remote]
     rows = _sort_rows(rows, sort, dir)
     ctx = {
         "request": request,
@@ -88,6 +91,7 @@ def job_list(
         "min_score": min_score,
         "max_age_days": max_age_days,
         "max_age_choices": _MAX_AGE_CHOICES,
+        "remote_only": remote_only,
         "sort": sort,
         "dir": dir,
     }
