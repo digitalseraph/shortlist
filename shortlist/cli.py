@@ -400,6 +400,28 @@ def tailor_cmd(
 # --- list -----------------------------------------------------------------
 
 
+def _format_comp(comp_min: int | None, comp_max: int | None) -> str:
+    """Render salary/hourly range. Amounts under 1000 treated as hourly."""
+
+    def one(n: int) -> str:
+        if n < 1000:
+            return f"${n}/hr"
+        if n % 1000 == 0:
+            return f"${n // 1000}k"
+        return f"${n / 1000:.1f}k"
+
+    if comp_min is None and comp_max is None:
+        return "—"
+    if comp_min is not None and comp_max is not None and comp_min != comp_max:
+        # Drop $ from right side to avoid "$200k–$240k" clutter; keep /hr suffix only on right.
+        left = one(comp_min).replace("/hr", "")
+        right = one(comp_max).lstrip("$").replace("/hr", "")
+        suffix = "/hr" if comp_max < 1000 else ""
+        return f"{left}–{right}{suffix}"
+    val = comp_max if comp_max is not None else comp_min
+    return one(val) if val is not None else "—"
+
+
 @app.command("list")
 def list_jobs_cmd(
     min_score: int = typer.Option(0, "--min-score", help="Hide jobs scoring below."),
@@ -418,6 +440,7 @@ def list_jobs_cmd(
     table.add_column("Company")
     table.add_column("Title", no_wrap=True)
     table.add_column("Location")
+    table.add_column("Comp", justify="right")
     table.add_column("URL", overflow="fold")
     for j in rows:
         table.add_row(
@@ -425,6 +448,7 @@ def list_jobs_cmd(
             j.company,
             j.title,
             j.location or "",
+            _format_comp(j.comp_min, j.comp_max),
             str(j.url),
         )
     console.print(table)

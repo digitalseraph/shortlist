@@ -40,7 +40,7 @@ class JobListScreen(Screen[None]):
 
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
-        table.add_columns("Score", "Company", "Title", "Location", "Status")
+        table.add_columns("Score", "Company", "Title", "Location", "Comp", "Status")
         self._reload()
         table.focus()
 
@@ -54,6 +54,7 @@ class JobListScreen(Screen[None]):
                 r.company,
                 r.title,
                 r.location,
+                r.comp_display,
                 r.status_display,
                 key=str(r.id),
             )
@@ -99,6 +100,7 @@ class JobListScreen(Screen[None]):
                 r.company,
                 r.title,
                 r.location,
+                r.comp_display,
                 r.status_display,
                 key=str(r.id),
             )
