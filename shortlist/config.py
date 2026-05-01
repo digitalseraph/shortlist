@@ -76,6 +76,7 @@ class Prefs(BaseModel):
     glassdoor_queries: list[str] = Field(default_factory=list)
     hn_enabled: bool = False
     remoteok_enabled: bool = False
+    remotive_enabled: bool = False
     wellfound_queries: list[str] = Field(default_factory=list)
     otta_queries: list[str] = Field(default_factory=list)
     rss_urls: list[str] = Field(default_factory=list)

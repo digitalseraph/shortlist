@@ -30,6 +30,7 @@ from shortlist.sources.ats.workable import WorkableSource
 from shortlist.sources.base import Source
 from shortlist.sources.curated.hn_who_hiring import HNWhoHiringSource
 from shortlist.sources.curated.remoteok import RemoteOKSource
+from shortlist.sources.curated.remotive import RemotiveSource
 from shortlist.sources.feeds.rss import RSSSource
 from shortlist.sources.scraped.glassdoor import GlassdoorBanDetectedError, GlassdoorSource
 from shortlist.sources.scraped.indeed import IndeedBanDetectedError, IndeedSource
@@ -66,6 +67,8 @@ def _build_sources(prefs: Prefs) -> list[Source]:
         sources.append(HNWhoHiringSource())
     if prefs.remoteok_enabled:
         sources.append(RemoteOKSource())
+    if prefs.remotive_enabled:
+        sources.append(RemotiveSource())
     if prefs.wellfound_queries:
         sources.append(WellfoundSource(queries=prefs.wellfound_queries))
     if prefs.otta_queries:
