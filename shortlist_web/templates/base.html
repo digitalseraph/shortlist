@@ -6,6 +6,18 @@
   <title>{% block title %}Shortlist{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script>
+    // HTMX 2.x by default refuses to swap 4xx/5xx responses, so error toasts
+    // disappear silently. Tell it to swap on any HTTP error so the user sees
+    // the same toast they'd see for a success.
+    document.addEventListener('htmx:beforeOnLoad', (e) => {
+      const x = e.detail.xhr;
+      if (x.status >= 400) {
+        e.detail.shouldSwap = true;
+        e.detail.isError = false;
+      }
+    });
+  </script>
 </head>
 <body>
   <header>
