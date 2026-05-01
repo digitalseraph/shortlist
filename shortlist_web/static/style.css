@@ -176,6 +176,25 @@ dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; f
 dt { font-weight: 600; color: var(--dim); }
 dd { font-family: var(--mono); word-break: break-all; }
 
+/* ── Cost dashboard ── */
+.cost-summary {
+  display: flex;
+  gap: var(--gap);
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.cost-card {
+  flex: 1 1 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+.cost-card.cost-grand { background: #cfe2ff; border-color: #9ec5fe; }
+.cost-label { font-size: 0.8rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.cost-value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 0.25rem; }
+.cost-meta { font-size: 0.75rem; margin-top: 0.25rem; }
+
 /* ── Utilities ── */
 .dim   { color: var(--dim); }
 .error { color: var(--danger); }

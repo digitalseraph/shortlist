@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Costs — Shortlist{% endblock %}
+{% block content %}
+<h1>Cost dashboard</h1>
+
+<div class="cost-summary">
+  <div class="cost-card cost-grand">
+    <div class="cost-label">Total spent</div>
+    <div class="cost-value">${{ "%.4f"|format(grand_total) }}</div>
+  </div>
+  <div class="cost-card">
+    <div class="cost-label">Rank ({{ rank_total.n }} runs)</div>
+    <div class="cost-value">${{ "%.4f"|format(rank_total.cost) }}</div>
+    <div class="cost-meta dim">{{ rank_total.tokens_in }} in / {{ rank_total.tokens_out }} out</div>
+  </div>
+  <div class="cost-card">
+    <div class="cost-label">Tailor ({{ tailor_total.n }} jobs)</div>
+    <div class="cost-value">${{ "%.4f"|format(tailor_total.cost) }}</div>
+    <div class="cost-meta dim">{{ tailor_total.tokens_in }} in / {{ tailor_total.tokens_out }} out</div>
+  </div>
+</div>
+
+<h2>By model</h2>
+{% if by_model %}
+<table class="job-table">
+  <thead>
+    <tr><th>Model</th><th>Runs</th><th>Cost</th><th>Tokens in</th><th>Tokens out</th></tr>
+  </thead>
+  <tbody>
+    {% for m in by_model %}
+    <tr>
+      <td><code>{{ m.model }}</code></td>
+      <td class="score">{{ m.runs }}</td>
+      <td class="comp">${{ "%.4f"|format(m.cost_usd) }}</td>
+      <td class="score">{{ m.tokens_in }}</td>
+      <td class="score">{{ m.tokens_out }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No ranking runs yet.</p>
+{% endif %}
+
+<h2>Recent rank runs</h2>
+{% if rank_runs %}
+<table class="job-table">
+  <thead>
+    <tr><th>Started</th><th>Model</th><th>Jobs</th><th>Cost</th><th>Tokens</th></tr>
+  </thead>
+  <tbody>
+    {% for r in rank_runs %}
+    <tr>
+      <td class="dim">{{ r.started_at.strftime("%Y-%m-%d %H:%M") if r.started_at else "—" }}</td>
+      <td><code>{{ r.model }}</code></td>
+      <td class="score">{{ r.job_count }}</td>
+      <td class="comp">${{ "%.4f"|format(r.cost_usd) }}</td>
+      <td class="dim">{{ r.tokens_in }}/{{ r.tokens_out }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No ranking runs yet.</p>
+{% endif %}
+
+<h2>Recent tailor jobs</h2>
+{% if tailor_rows %}
+<table class="job-table">
+  <thead>
+    <tr><th>When</th><th>Company</th><th>Title</th><th>Cost</th><th>Tokens</th></tr>
+  </thead>
+  <tbody>
+    {% for t in tailor_rows %}
+    <tr>
+      <td class="dim">{{ t.rendered_at.strftime("%Y-%m-%d %H:%M") if t.rendered_at else "—" }}</td>
+      <td>{{ t.company }}</td>
+      <td><a href="/job/{{ t.job_id }}">{{ t.title }}</a></td>
+      <td class="comp">${{ "%.4f"|format(t.cost_usd) }}</td>
+      <td class="dim">{{ t.tokens_in }}/{{ t.tokens_out }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No tailored jobs yet.</p>
+{% endif %}
+{% endblock %}

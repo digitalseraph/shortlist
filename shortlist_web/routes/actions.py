@@ -84,20 +84,30 @@ def fetch(background: BackgroundTasks, request: Request) -> HTMLResponse:
 
 
 @router.post("/rank", response_class=HTMLResponse)
-def rank(background: BackgroundTasks, request: Request) -> HTMLResponse:
+def rank(
+    background: BackgroundTasks, request: Request, mode: str = "no-llm"
+) -> HTMLResponse:
+    """Run the ranking pipeline. mode='llm' uses Claude; 'no-llm' is cosine-only."""
+    if mode not in ("llm", "no-llm"):
+        return _toast(request, f"invalid mode: {mode}", "error", code=400)
     cfg = load_config(paths.config_path())
     prefs = load_prefs(paths.prefs_path())
     resume = cfg.paths.resume.expanduser()
     if not resume.exists():
         return _toast(request, f"resume not found at {resume}", "error", code=400)
-    key = os.environ.get(cfg.anthropic.key_env_var, "")
     client = None
-    if key:
+    if mode == "llm":
+        key = os.environ.get(cfg.anthropic.key_env_var, "")
+        if not key:
+            return _toast(
+                request, f"{cfg.anthropic.key_env_var} not set", "error", code=400
+            )
         from anthropic import Anthropic
 
         client = Anthropic(api_key=key)
     background.add_task(_run_rank, request.app, paths.db_path(), cfg, prefs, resume, client)
-    return _toast(request, "rank started" + (" (no LLM)" if client is None else ""), "info")
+    label = "rank started (LLM)" if client else "rank started (cosine only)"
+    return _toast(request, label, "info")
 
 
 @router.post("/tailor/{job_id}", response_class=HTMLResponse)

@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from shortlist_web.routes import actions, applications, jobs, settings
+from shortlist_web.routes import actions, applications, costs, jobs, settings
 
 
 def create_app() -> FastAPI:
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
 
     app.include_router(jobs.router)
     app.include_router(applications.router)
+    app.include_router(costs.router)
     app.include_router(settings.router)
     app.include_router(actions.router)
 

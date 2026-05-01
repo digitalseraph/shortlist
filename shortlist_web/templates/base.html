@@ -12,11 +12,15 @@
     <nav>
       <a href="/">Jobs</a>
       <a href="/applications">Applications</a>
+      <a href="/costs">Costs</a>
       <a href="/settings">Settings</a>
     </nav>
     <div class="actions">
       <button hx-post="/fetch" hx-target="#toast" hx-swap="innerHTML">Fetch</button>
-      <button hx-post="/rank" hx-target="#toast" hx-swap="innerHTML">Rank</button>
+      <button hx-post="/rank?mode=no-llm" hx-target="#toast" hx-swap="innerHTML"
+              title="cosine similarity only — free">Rank</button>
+      <button hx-post="/rank?mode=llm" hx-target="#toast" hx-swap="innerHTML"
+              title="cosine + Claude rerank — costs $$">Rank (LLM)</button>
     </div>
   </header>
   <div id="toast"></div>
