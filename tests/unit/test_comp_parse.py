@@ -70,3 +70,15 @@ def test_clamps_implausibly_low_salary():
 
 def test_bare_numbers_treated_as_thousands():
     assert parse_comp_from_text("Salary 150-180 USD base") == (150000, 180000)
+
+
+def test_does_not_crash_on_lone_punctuation():
+    # Regression: "[\d,]+" matched bare commas/dots and crashed _to_int with
+    # ValueError("could not convert string to float: ''"). Now must return cleanly.
+    for text in (",,, to ,,,", "$, - $,", ". to .", "$ - $"):
+        assert parse_comp_from_text(text) == (None, None)
+
+
+def test_handles_text_with_random_commas():
+    # Real-world: "We pay well, $200k-240k base" — comma inside should be fine.
+    assert parse_comp_from_text("We pay well, $200k-240k base") == (200000, 240000)

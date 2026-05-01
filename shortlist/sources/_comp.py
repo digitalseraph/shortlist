@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import re
 
-# Match a single dollar amount: optional $, digits with optional commas/decimal,
-# optional k/K/m/M suffix.
-_AMOUNT = r"\$?\s*([\d,]+(?:\.\d+)?)\s*([kKmM])?"
+# Match a single dollar amount: optional $, MUST start with a digit (otherwise
+# bare commas / dots match and produce empty captures), optional commas inside,
+# optional decimal, optional k/K/m/M suffix.
+_AMOUNT = r"\$?\s*(\d[\d,]*(?:\.\d+)?)\s*([kKmM])?"
 
 # Range: AMOUNT separator AMOUNT, with optional "$" on right side and
 # common separators (-, –, —, "to").
@@ -49,8 +50,15 @@ _REJECT_RE = re.compile(
 
 
 def _to_int(num: str, suffix: str | None, *, hourly: bool = False) -> int:
-    """Convert a captured (digits, suffix) into an int dollar amount."""
-    n = float(num.replace(",", ""))
+    """Convert a captured (digits, suffix) into an int dollar amount.
+
+    Returns 0 on degenerate input (empty after comma strip); caller's
+    range checks reject zeros downstream.
+    """
+    cleaned = num.replace(",", "").strip()
+    if not cleaned or not any(ch.isdigit() for ch in cleaned):
+        return 0
+    n = float(cleaned)
     if suffix and suffix.lower() == "k":
         n *= 1000
     elif suffix and suffix.lower() == "m":
