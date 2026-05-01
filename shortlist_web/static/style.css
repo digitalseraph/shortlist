@@ -55,6 +55,8 @@ button, input[type="submit"] {
   white-space: nowrap;
 }
 button:hover { background: var(--bg); }
+button.danger { border-color: var(--danger); color: var(--danger); }
+button.danger:hover { background: var(--danger); color: white; }
 
 /* ── Main ── */
 main { padding: var(--gap); max-width: 1400px; margin: 0 auto; }

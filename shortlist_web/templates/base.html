@@ -19,6 +19,11 @@
       <button hx-post="/fetch" hx-target="#toast" hx-swap="innerHTML">Fetch</button>
       <button hx-post="/rank?mode=no-llm" hx-target="#toast" hx-swap="innerHTML"
               title="cosine score every job — free">Rank All</button>
+      <button hx-post="/jobs/purge-untailored"
+              hx-target="#toast" hx-swap="innerHTML"
+              hx-confirm="Delete all jobs except tailored ones? This cannot be undone."
+              class="danger"
+              title="keep tailored jobs only — destructive">Purge Untailored</button>
     </div>
   </header>
   <div id="toast"></div>

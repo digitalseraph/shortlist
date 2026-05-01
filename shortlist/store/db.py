@@ -199,6 +199,33 @@ def list_jobs(
     return [_row_to_job(r) for r in rows]
 
 
+def purge_untailored(path: Path) -> int:
+    """Delete every job that has no tailor_outputs row. Returns delete count.
+
+    Cascades via FK ON DELETE CASCADE for events, applications, contacts.
+    job_embeddings is a vec0 virtual table without FK, so we prune it
+    explicitly. tailor_outputs are kept because their parent jobs are kept.
+    """
+    with connect(path) as conn:
+        before = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        keep_ids = [r[0] for r in conn.execute("SELECT job_id FROM tailor_outputs")]
+        if keep_ids:
+            placeholders = ",".join("?" * len(keep_ids))
+            conn.execute(
+                f"DELETE FROM job_embeddings WHERE job_id NOT IN ({placeholders})",
+                keep_ids,
+            )
+            conn.execute(
+                f"DELETE FROM jobs WHERE id NOT IN ({placeholders})",
+                keep_ids,
+            )
+        else:
+            conn.execute("DELETE FROM job_embeddings")
+            conn.execute("DELETE FROM jobs")
+        after = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+    return before - after
+
+
 def update_score(
     path: Path,
     job_id: int,

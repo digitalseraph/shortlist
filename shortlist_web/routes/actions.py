@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from shortlist import paths
 from shortlist.config import load_config, load_prefs
+from shortlist.store import db as store_db
 from shortlist_tui.workers import fetch_all, rank_all, rerank_selected, tailor_one
 
 router = APIRouter()
@@ -202,6 +203,14 @@ def tailor(job_id: int, background: BackgroundTasks, request: Request) -> HTMLRe
         Anthropic(api_key=key),
     )
     return _toast(request, f"tailoring job {job_id}…", "info")
+
+
+@router.post("/jobs/purge-untailored", response_class=HTMLResponse)
+def purge_untailored(request: Request) -> HTMLResponse:
+    """Delete every job that has no tailor_outputs row. Destructive."""
+    n = store_db.purge_untailored(paths.db_path())
+    _append_log(request.app, f"purge: deleted {n} untailored job(s)")
+    return _toast(request, f"deleted {n} untailored job(s)", "info")
 
 
 @router.get("/status", response_class=HTMLResponse)
