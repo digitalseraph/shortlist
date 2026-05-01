@@ -11,7 +11,8 @@
     hx-trigger="keyup changed delay:300ms"
     hx-target="#job-tbody"
     hx-swap="innerHTML"
-    hx-include="[name='min_score'],[name='max_age_days'],[name='remote_only']"
+    hx-include="[name='min_score'],[name='max_age_days'],[name='remote_only'],[name='sort'],[name='dir']"
+    hx-push-url="true"
   >
   <label>
     min score
@@ -24,7 +25,8 @@
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"
-      hx-include="[name='q'],[name='max_age_days'],[name='remote_only']"
+      hx-include="[name='q'],[name='max_age_days'],[name='remote_only'],[name='sort'],[name='dir']"
+      hx-push-url="true"
     >
   </label>
   <label>
@@ -37,7 +39,8 @@
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"
-      hx-include="[name='q'],[name='min_score'],[name='max_age_days']"
+      hx-include="[name='q'],[name='min_score'],[name='max_age_days'],[name='sort'],[name='dir']"
+      hx-push-url="true"
     >
     remote only
   </label>
@@ -55,7 +58,8 @@
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"
-      hx-include="[name='q'],[name='min_score'],[name='remote_only']"
+      hx-include="[name='q'],[name='min_score'],[name='remote_only'],[name='sort'],[name='dir']"
+      hx-push-url="true"
     >
       {% for choice in max_age_choices %}
       <option value="{{ choice }}" {% if choice == max_age_days %}selected{% endif %}>
