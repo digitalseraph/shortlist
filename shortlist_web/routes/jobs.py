@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from starlette.responses import Response
 from jinja2 import Environment, FileSystemLoader
+from starlette.responses import Response
 
 from shortlist import paths
 from shortlist.store import db as store_db
 from shortlist.store.db import transition_status, update_application
 from shortlist.tracker.state import InvalidStatusTransitionError, allowed_next
-from shortlist_tui.data import list_job_rows
+from shortlist_tui.data import JobRow, list_job_rows
 
 router = APIRouter()
 
@@ -35,17 +37,58 @@ def _load_tailor_dir(db_path: Path, job_id: int) -> Path | None:
     return Path(row[0])
 
 
+_SORT_KEYS: dict[str, Callable[[JobRow], Any]] = {
+    "score": lambda r: (r.score is None, r.score or 0),
+    "company": lambda r: r.company.lower(),
+    "title": lambda r: r.title.lower(),
+    "location": lambda r: (r.location or "").lower(),
+    "comp": lambda r: r.comp_max or r.comp_min or 0,
+    "status": lambda r: r.status,
+}
+
+
+def _sort_rows(rows: list[JobRow], sort: str, direction: str) -> list[JobRow]:
+    key_fn = _SORT_KEYS.get(sort, _SORT_KEYS["score"])
+    reverse = direction == "desc"
+    return sorted(rows, key=key_fn, reverse=reverse)
+
+
 @router.get("/", response_class=HTMLResponse)
-def job_list(request: Request, q: str | None = None, min_score: int = 0) -> HTMLResponse:
+def job_list(
+    request: Request,
+    q: str | None = None,
+    min_score: int = 0,
+    sort: str = "score",
+    dir: str = "desc",  # noqa: A002 — matches HTMX query name
+) -> HTMLResponse:
+    if sort not in _SORT_KEYS:
+        sort = "score"
+    if dir not in ("asc", "desc"):
+        dir = "desc"
     rows = list_job_rows(paths.db_path(), min_score=min_score if min_score else None)
     if q:
         ql = q.lower()
         rows = [r for r in rows if ql in r.company.lower() or ql in r.title.lower()]
-    html = (
-        _get_env(request)
-        .get_template("job_list.html")
-        .render(request=request, rows=rows, q=q or "", min_score=min_score)
-    )
+    rows = _sort_rows(rows, sort, dir)
+    ctx = {
+        "request": request,
+        "rows": rows,
+        "q": q or "",
+        "min_score": min_score,
+        "sort": sort,
+        "dir": dir,
+    }
+    # HTMX swaps target #joblist-wrap (sort clicks) or #job-tbody (filter inputs).
+    # Filter inputs use hx-target="#job-tbody" and request just rows; sort
+    # links target the wrap and request the full table.
+    htmx_target = request.headers.get("HX-Target", "")
+    if htmx_target == "job-tbody":
+        template = "_joblist_rows.html"
+    elif request.headers.get("HX-Request"):
+        template = "_joblist_table.html"
+    else:
+        template = "job_list.html"
+    html = _get_env(request).get_template(template).render(**ctx)
     return HTMLResponse(html)
 
 

@@ -1,0 +1,34 @@
+{% macro sort_th(col, label, classes="") %}
+  {% set is_active = sort == col %}
+  {% set new_dir = "asc" if is_active and dir == "desc" else "desc" %}
+  {% set arrow = "" %}
+  {% if is_active %}{% set arrow = " ▼" if dir == "desc" else " ▲" %}{% endif %}
+  <th class="sortable {% if is_active %}sort-active{% endif %} {{ classes }}">
+    <a href="#"
+       hx-get="/?sort={{ col }}&dir={{ new_dir }}{% if q %}&q={{ q }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}"
+       hx-target="#joblist-wrap"
+       hx-swap="outerHTML"
+       hx-push-url="true">{{ label }}{{ arrow }}</a>
+  </th>
+{% endmacro %}
+<div id="joblist-wrap">
+<table class="job-table">
+  <thead>
+    <tr>
+      {{ sort_th("score", "Score") }}
+      {{ sort_th("company", "Company") }}
+      {{ sort_th("title", "Title") }}
+      {{ sort_th("location", "Location") }}
+      {{ sort_th("comp", "Comp") }}
+      {{ sort_th("status", "Status") }}
+      <th colspan="2"></th>
+    </tr>
+  </thead>
+  <tbody id="job-tbody">
+    {% for row in rows %}{% include "_job_row.html" %}{% endfor %}
+  </tbody>
+</table>
+{% if not rows %}
+<p class="empty">No jobs found. Click <strong>Fetch</strong> to pull from sources.</p>
+{% endif %}
+</div>
