@@ -22,7 +22,7 @@
     </div>
   </header>
   <div id="toast"></div>
-  <div id="status-feed" hx-get="/status" hx-trigger="every 5s" hx-swap="innerHTML"></div>
+  <div id="status-feed" hx-get="/status" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
   <main>{% block content %}{% endblock %}</main>
 </body>
 </html>

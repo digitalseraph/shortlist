@@ -16,7 +16,7 @@ from shortlist_tui.workers import fetch_all, rank_all, rerank_selected, tailor_o
 
 router = APIRouter()
 
-_LOG_MAX = 50
+_LOG_MAX = 200
 
 
 def _get_env(request: Request) -> Environment:
@@ -25,8 +25,11 @@ def _get_env(request: Request) -> Environment:
 
 
 def _append_log(app: Any, entry: str) -> None:
+    from datetime import datetime as _dt
+
     log: list[str] = app.state.task_log
-    log.append(entry)
+    stamp = _dt.now().strftime("%H:%M:%S")
+    log.append(f"[{stamp}] {entry}")
     if len(log) > _LOG_MAX:
         app.state.task_log = log[-_LOG_MAX:]
 
@@ -41,10 +44,15 @@ def _toast(request: Request, message: str, severity: str, *, code: int = 200) ->
 # ---------------------------------------------------------------------------
 
 
+def _progress(app: Any) -> Any:
+    """Build a progress callback that appends each message to the task log."""
+    return lambda msg: _append_log(app, msg)
+
+
 def _run_fetch(app: Any, db_path: Path, prefs: Any) -> None:
     try:
-        result = fetch_all(db_path, prefs)
-        _append_log(app, f"fetch: {result}")
+        result = fetch_all(db_path, prefs, progress=_progress(app))
+        _append_log(app, f"fetch done: {result}")
     except Exception as exc:  # noqa: BLE001
         _append_log(app, f"fetch error: {exc}")
 
@@ -52,9 +60,14 @@ def _run_fetch(app: Any, db_path: Path, prefs: Any) -> None:
 def _run_rank(app: Any, db_path: Path, cfg: Any, prefs: Any, resume: Path, client: Any) -> None:
     try:
         result = rank_all(
-            db_path, cfg=cfg, prefs=prefs, resume_path=resume, anthropic_client=client
+            db_path,
+            cfg=cfg,
+            prefs=prefs,
+            resume_path=resume,
+            anthropic_client=client,
+            progress=_progress(app),
         )
-        _append_log(app, f"rank: {result}")
+        _append_log(app, f"rank done: {result}")
     except Exception as exc:  # noqa: BLE001
         _append_log(app, f"rank error: {exc}")
 
@@ -76,8 +89,9 @@ def _run_rerank_selected(
             prefs=prefs,
             resume_path=resume,
             anthropic_client=client,
+            progress=_progress(app),
         )
-        _append_log(app, f"rerank: {result}")
+        _append_log(app, f"rerank done: {result}")
     except Exception as exc:  # noqa: BLE001
         _append_log(app, f"rerank error: {exc}")
 
@@ -195,6 +209,6 @@ def status(request: Request) -> HTMLResponse:
     """HTMX-polled status feed."""
     log = list(getattr(request.app.state, "task_log", []))
     html = (
-        _get_env(request).get_template("_status.html").render(request=request, log=log[-10:][::-1])
+        _get_env(request).get_template("_status.html").render(request=request, log=log[-25:][::-1])
     )
     return HTMLResponse(html)

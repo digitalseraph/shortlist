@@ -7,9 +7,16 @@ that screens can display.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+ProgressFn = Callable[[str], None]
+
+
+def _noop(_: str) -> None:
+    return None
 
 from shortlist.config import Config, Prefs
 from shortlist.ranker.embeddings import EmbeddingService
@@ -68,20 +75,30 @@ def _build_sources(prefs: Prefs) -> list[Source]:
     return sources
 
 
-def fetch_all(db_path: Path, prefs: Prefs) -> str:
+def fetch_all(
+    db_path: Path, prefs: Prefs, *, progress: ProgressFn | None = None
+) -> str:
     """Pull jobs from every configured source. Returns a summary line."""
+    on = progress or _noop
+    sources = _build_sources(prefs)
+    on(f"fetch: {len(sources)} sources configured")
     total = 0
     errors: list[str] = []
     cooled: list[str] = []
-    for src in _build_sources(prefs):
+    for src in sources:
         if store_db.is_source_in_cooldown(db_path, src.name):
             cooled.append(src.name)
+            on(f"fetch[{src.name}]: cooled, skipping")
             continue
+        on(f"fetch[{src.name}]: starting…")
         try:
+            n = 0
             for raw in src.fetch(since=store_db.source_last_fetched(db_path, src.name)):
                 store_db.upsert_job(db_path, raw)
                 total += 1
+                n += 1
             store_db.mark_source_fetched(db_path, src.name, datetime.now(UTC))
+            on(f"fetch[{src.name}]: +{n} jobs")
         except (
             IndeedBanDetectedError,
             LinkedInBanDetectedError,
@@ -95,8 +112,10 @@ def fetch_all(db_path: Path, prefs: Prefs) -> str:
                 until=datetime.now(UTC) + timedelta(hours=24),
             )
             errors.append(f"{src.name}: banned, cooled 24h")
+            on(f"fetch[{src.name}]: banned, cooled 24h")
         except Exception as e:  # noqa: BLE001
             errors.append(f"{src.name}: {e}")
+            on(f"fetch[{src.name}]: error — {e}")
     parts = [f"fetched {total} jobs"]
     if cooled:
         parts.append(f"({len(cooled)} cooled)")
@@ -113,7 +132,10 @@ def rank_all(
     resume_path: Path,
     anthropic_client: Any | None,
     top_k: int = 30,
+    progress: ProgressFn | None = None,
 ) -> str:
+    on = progress or _noop
+    on("rank: loading embedding model…")
     embedder = EmbeddingService(model_name=cfg.ranker.embedding_model)
     reranker = (
         LLMReranker(client=anthropic_client, model=cfg.ranker.rerank_model)
@@ -127,6 +149,7 @@ def rank_all(
         embedder=embedder,
         reranker=reranker,
         top_k=top_k,
+        progress=on,
     )
     return (
         f"cosine_scored={summary.cosine_scored} | filtered={summary.filtered} | "
@@ -143,8 +166,11 @@ def rerank_selected(
     prefs: Prefs,
     resume_path: Path,
     anthropic_client: Any,
+    progress: ProgressFn | None = None,
 ) -> str:
     """LLM rerank a specific list of job IDs. Caller supplies a real client."""
+    on = progress or _noop
+    on(f"rerank: {len(job_ids)} job(s) → Claude Haiku")
     reranker = LLMReranker(client=anthropic_client, model=cfg.ranker.rerank_model)
     summary = rerank_jobs(
         db_path,
@@ -152,6 +178,7 @@ def rerank_selected(
         prefs=prefs,
         resume_path=resume_path,
         reranker=reranker,
+        progress=on,
     )
     return (
         f"reranked {summary.scored}/{summary.requested} | "

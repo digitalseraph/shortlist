@@ -69,7 +69,20 @@ h2 { font-size: 1rem; margin-bottom: 0.5rem; }
 .toast.error { background: #f8d7da; color: #842029; }
 
 #status-feed { padding: 0 var(--gap); }
-.status-log { list-style: none; font-size: 0.8rem; color: var(--dim); }
+.status-log {
+  list-style: none;
+  font-size: 0.8rem;
+  color: var(--dim);
+  font-family: var(--mono);
+  max-height: 8rem;
+  overflow-y: auto;
+  border-left: 2px solid var(--border);
+  padding-left: 0.6rem;
+  margin-top: 0.25rem;
+}
+.status-log:empty { display: none; }
+.status-log li { padding: 0.05rem 0; }
+.status-log li:first-child { color: var(--text); font-weight: 500; }
 .status-log li::before { content: "› "; }
 
 /* ── Toolbar ── */

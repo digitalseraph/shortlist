@@ -18,10 +18,17 @@ explicit list of job IDs (used by the web "Rank Selected (LLM)" button).
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+ProgressFn = Callable[[str], None]
+
+
+def _noop(_: str) -> None:
+    return None
 
 from shortlist.config import Prefs
 from shortlist.models import Job
@@ -89,22 +96,33 @@ def run_pipeline(
     embedder: EmbeddingService,
     reranker: LLMReranker | None,
     top_k: int = 30,
+    progress: ProgressFn | None = None,
 ) -> PipelineSummary:
     """Cosine-score every job, optionally LLM-rerank the top-K survivors."""
+    on = progress or _noop
     all_jobs = store_db.list_jobs(db_path)
     if not all_jobs:
+        on("rank: no jobs in store")
         return PipelineSummary(0, 0, 0, 0, 0.0)
 
     survivor_ids = {j.id for j in all_jobs if passes(j, prefs)}
     filtered_count = len(all_jobs) - len(survivor_ids)
+    on(f"rank: {len(all_jobs)} jobs ({len(survivor_ids)} pass filter, {filtered_count} filtered)")
 
     # Stage 1: embed every job and cosine-score every one of them.
     resume_vec = embed_resume_cached(db_path, resume_path, service=embedder)
-    for job in all_jobs:
-        if store_db.get_embedding(db_path, job.id) is None:
+    needs_embed = [j for j in all_jobs if store_db.get_embedding(db_path, j.id) is None]
+    if needs_embed:
+        on(f"rank: embedding {len(needs_embed)} new jobs (this can take a while)")
+        for i, job in enumerate(needs_embed, 1):
             text = f"{job.title}\n\n{job.description_md or ''}"
             store_db.upsert_embedding(db_path, job.id, embedder.encode(text))
+            if i % 50 == 0 or i == len(needs_embed):
+                on(f"rank: embedded {i}/{len(needs_embed)}")
+    else:
+        on("rank: all jobs already embedded")
 
+    on("rank: computing cosine scores")
     ranked = store_db.cosine_top_k(db_path, resume_vec, k=len(all_jobs))
     distance_by_id = {jid: dist for (jid, dist) in ranked}
     for j in all_jobs:
@@ -118,6 +136,7 @@ def run_pipeline(
             reason=f"{prefix}cosine sim ({score}/100)",
             model="cosine_only",
         )
+    on(f"rank: scored {len(all_jobs)} jobs by cosine")
 
     # Pick the top-K survivors (filter-passing) by cosine for LLM rerank.
     top_jobs: list[Job] = []
@@ -136,6 +155,7 @@ def run_pipeline(
     tokens_in = 0
     tokens_out = 0
     if reranker is not None and top_jobs:
+        on(f"rank: LLM rerank top {len(top_jobs)} via Claude Haiku…")
         req = RerankRequest(
             resume=resume_path.read_text(),
             prefs_summary=_prefs_summary(prefs),
@@ -208,8 +228,10 @@ def rerank_jobs(
     prefs: Prefs,
     resume_path: Path,
     reranker: LLMReranker,
+    progress: ProgressFn | None = None,
 ) -> RerankSummary:
     """Run LLM rerank on a specific list of job IDs and persist the new scores."""
+    on = progress or _noop
     if not job_ids:
         return RerankSummary(0, 0, 0.0, 0, 0)
 
@@ -217,7 +239,9 @@ def rerank_jobs(
     by_id = {j.id: j for j in all_jobs}
     targets = [by_id[i] for i in job_ids if i in by_id]
     if not targets:
+        on(f"rerank: none of {len(job_ids)} ids exist in store")
         return RerankSummary(len(job_ids), 0, 0.0, 0, 0)
+    on(f"rerank: sending {len(targets)} job(s) to Claude Haiku…")
 
     req = RerankRequest(
         resume=resume_path.read_text(),
