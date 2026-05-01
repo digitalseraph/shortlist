@@ -11,7 +11,7 @@
     hx-trigger="keyup changed delay:300ms"
     hx-target="#job-tbody"
     hx-swap="innerHTML"
-    hx-include="[name='min_score']"
+    hx-include="[name='min_score'],[name='max_age_days']"
   >
   <label>
     min score
@@ -24,8 +24,30 @@
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"
-      hx-include="[name='q']"
+      hx-include="[name='q'],[name='max_age_days']"
     >
+  </label>
+  <label>
+    posted within
+    <select
+      name="max_age_days"
+      hx-get="/"
+      hx-trigger="change"
+      hx-target="#job-tbody"
+      hx-swap="innerHTML"
+      hx-include="[name='q'],[name='min_score']"
+    >
+      {% for choice in max_age_choices %}
+      <option value="{{ choice }}" {% if choice == max_age_days %}selected{% endif %}>
+        {% if choice == 0 %}all time
+        {% elif choice == 7 %}7 days
+        {% elif choice == 30 %}30 days
+        {% elif choice == 90 %}90 days
+        {% elif choice == 365 %}1 year
+        {% else %}{{ choice }} days{% endif %}
+      </option>
+      {% endfor %}
+    </select>
   </label>
 </div>
 

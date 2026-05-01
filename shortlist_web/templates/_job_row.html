@@ -4,6 +4,7 @@
   <td><a href="/job/{{ row.id }}">{{ row.title }}</a></td>
   <td class="dim">{{ row.location }}</td>
   <td class="comp">{{ row.comp_display }}</td>
+  <td class="dim">{{ row.posted_display }}</td>
   <td><span class="badge status-{{ row.status }}">{{ row.status_display }}</span></td>
   <td>
     <button hx-post="/tailor/{{ row.id }}" hx-target="#toast" hx-swap="innerHTML">Tailor</button>

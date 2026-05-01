@@ -44,6 +44,7 @@ _SORT_KEYS: dict[str, Callable[[JobRow], Any]] = {
     "location": lambda r: (r.location or "").lower(),
     "comp": lambda r: r.comp_max or r.comp_min or 0,
     "status": lambda r: r.status,
+    "posted": lambda r: (r.posted_at is None, r.posted_at or datetime.min.replace(tzinfo=UTC)),
 }
 
 
@@ -53,11 +54,15 @@ def _sort_rows(rows: list[JobRow], sort: str, direction: str) -> list[JobRow]:
     return sorted(rows, key=key_fn, reverse=reverse)
 
 
+_MAX_AGE_CHOICES = (7, 30, 90, 365, 0)  # 0 = "all"
+
+
 @router.get("/", response_class=HTMLResponse)
 def job_list(
     request: Request,
     q: str | None = None,
     min_score: int = 0,
+    max_age_days: int = 365,
     sort: str = "score",
     dir: str = "desc",  # noqa: A002 — matches HTMX query name
 ) -> HTMLResponse:
@@ -65,7 +70,13 @@ def job_list(
         sort = "score"
     if dir not in ("asc", "desc"):
         dir = "desc"
-    rows = list_job_rows(paths.db_path(), min_score=min_score if min_score else None)
+    if max_age_days not in _MAX_AGE_CHOICES:
+        max_age_days = 365
+    rows = list_job_rows(
+        paths.db_path(),
+        min_score=min_score if min_score else None,
+        max_age_days=max_age_days if max_age_days else None,
+    )
     if q:
         ql = q.lower()
         rows = [r for r in rows if ql in r.company.lower() or ql in r.title.lower()]
@@ -75,6 +86,8 @@ def job_list(
         "rows": rows,
         "q": q or "",
         "min_score": min_score,
+        "max_age_days": max_age_days,
+        "max_age_choices": _MAX_AGE_CHOICES,
         "sort": sort,
         "dir": dir,
     }

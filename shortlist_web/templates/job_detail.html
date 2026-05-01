@@ -6,6 +6,7 @@
   <p class="meta dim">
     {{ job.location or "—" }} ·
     score {{ job.score if job.score is not none else "—" }} ·
+    posted {{ job.posted_at.strftime("%Y-%m-%d") if job.posted_at else "—" }} ·
     <span class="badge status-{{ job.status }}">{{ job.status }}</span> ·
     <a href="{{ job.url }}" target="_blank" rel="noopener">open posting</a>
   </p>

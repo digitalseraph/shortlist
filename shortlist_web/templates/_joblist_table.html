@@ -5,7 +5,7 @@
   {% if is_active %}{% set arrow = " ▼" if dir == "desc" else " ▲" %}{% endif %}
   <th class="sortable {% if is_active %}sort-active{% endif %} {{ classes }}">
     <a href="#"
-       hx-get="/?sort={{ col }}&dir={{ new_dir }}{% if q %}&q={{ q }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}"
+       hx-get="/?sort={{ col }}&dir={{ new_dir }}{% if q %}&q={{ q }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if max_age_days is defined %}&max_age_days={{ max_age_days }}{% endif %}"
        hx-target="#joblist-wrap"
        hx-swap="outerHTML"
        hx-push-url="true">{{ label }}{{ arrow }}</a>
@@ -20,6 +20,7 @@
       {{ sort_th("title", "Title") }}
       {{ sort_th("location", "Location") }}
       {{ sort_th("comp", "Comp") }}
+      {{ sort_th("posted", "Posted") }}
       {{ sort_th("status", "Status") }}
       <th colspan="2"></th>
     </tr>

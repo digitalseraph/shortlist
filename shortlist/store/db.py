@@ -12,7 +12,7 @@ import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -168,9 +168,13 @@ def list_jobs(
     *,
     status: JobStatus | None = None,
     min_score: int | None = None,
+    max_age_days: int | None = None,
     limit: int | None = None,
 ) -> list[Job]:
-    """Read jobs ordered by score DESC NULLS LAST, then discovered_at DESC."""
+    """Read jobs ordered by score DESC NULLS LAST, then discovered_at DESC.
+
+    `max_age_days` filters out jobs whose `posted_at` is older than the cutoff.
+    """
     sql = "SELECT * FROM jobs"
     clauses: list[str] = []
     params: list[object] = []
@@ -180,6 +184,10 @@ def list_jobs(
     if min_score is not None:
         clauses.append("score >= ?")
         params.append(min_score)
+    if max_age_days is not None:
+        cutoff = _utc_iso(datetime.now(UTC) - timedelta(days=max_age_days))
+        clauses.append("posted_at >= ?")
+        params.append(cutoff)
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     sql += " ORDER BY (score IS NULL), score DESC, discovered_at DESC"

@@ -7,6 +7,7 @@ The TUI only consumes these. Writes go through shortlist_tui.workers
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from shortlist.models import JobStatus
@@ -34,6 +35,23 @@ def _format_comp(comp_min: int | None, comp_max: int | None) -> str:
     return one(val) if val is not None else "—"
 
 
+def _format_posted(posted_at: datetime | None) -> str:
+    """Render relative posted age: today / Nd / Nw / Nmo / Ny."""
+    if posted_at is None:
+        return "—"
+    delta = datetime.now(UTC) - posted_at
+    days = delta.days
+    if days < 1:
+        return "today"
+    if days < 7:
+        return f"{days}d"
+    if days < 30:
+        return f"{days // 7}w"
+    if days < 365:
+        return f"{days // 30}mo"
+    return f"{days // 365}y"
+
+
 @dataclass(frozen=True)
 class JobRow:
     """View-friendly job for table display."""
@@ -47,6 +65,7 @@ class JobRow:
     url: str
     comp_min: int | None = None
     comp_max: int | None = None
+    posted_at: datetime | None = None
 
     @property
     def score_display(self) -> str:
@@ -60,15 +79,26 @@ class JobRow:
     def comp_display(self) -> str:
         return _format_comp(self.comp_min, self.comp_max)
 
+    @property
+    def posted_display(self) -> str:
+        return _format_posted(self.posted_at)
+
 
 def list_job_rows(
     db_path: Path,
     *,
     status: JobStatus | None = None,
     min_score: int | None = None,
+    max_age_days: int | None = None,
     limit: int | None = None,
 ) -> list[JobRow]:
-    jobs = store_db.list_jobs(db_path, status=status, min_score=min_score, limit=limit)
+    jobs = store_db.list_jobs(
+        db_path,
+        status=status,
+        min_score=min_score,
+        max_age_days=max_age_days,
+        limit=limit,
+    )
     return [
         JobRow(
             id=j.id,
@@ -80,6 +110,7 @@ def list_job_rows(
             url=str(j.url),
             comp_min=j.comp_min,
             comp_max=j.comp_max,
+            posted_at=j.posted_at,
         )
         for j in jobs
     ]
