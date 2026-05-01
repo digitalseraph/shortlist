@@ -56,9 +56,13 @@ class JobDetailScreen(Screen[None]):
             self.query_one("#title", Static).update("[red]job not found[/red]")
             return
         job = jobs[0]
+        from shortlist_tui.data import _format_comp
+
+        comp_str = _format_comp(job.comp_min, job.comp_max)
         self.query_one("#title", Static).update(f"[bold]{job.company}[/bold] — {job.title}")
         self.query_one("#meta", Static).update(
-            f"[dim]{job.location or ''} · {job.status} · score={job.score or '—'}[/dim]\n"
+            f"[dim]{job.location or '—'} · {comp_str} · "
+            f"{job.status} · score={job.score or '—'}[/dim]\n"
             f"[blue]{job.url}[/blue]"
         )
         self.query_one("#description", Markdown).update(job.description_md or "")

@@ -59,7 +59,14 @@ class ApplicationsBoardScreen(Screen[None]):
             self.query_one(f"#col-{status}-header", Static).update(
                 f"[bold]{status}[/bold] ({len(rows)})"
             )
-            body = "\n".join(f"• {r.company} — {r.title[:30]}" for r in rows) or "[dim]none[/dim]"
+            lines: list[str] = []
+            for r in rows:
+                loc = r.location[:20] if r.location else "—"
+                lines.append(
+                    f"• [bold]{r.company}[/bold] — {r.title[:30]}\n"
+                    f"  [dim]{loc} · {r.comp_display}[/dim]"
+                )
+            body = "\n".join(lines) or "[dim]none[/dim]"
             self.query_one(f"#col-{status}-body", Static).update(body)
 
     def action_refresh(self) -> None:
