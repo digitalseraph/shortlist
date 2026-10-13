@@ -7,7 +7,7 @@
     name="q"
     value="{{ q }}"
     placeholder="filter by company or title…"
-    hx-get="/"
+    hx-get="/p/{{ active.slug }}/"
     hx-trigger="keyup changed delay:300ms"
     hx-target="#job-tbody"
     hx-swap="innerHTML"
@@ -21,7 +21,7 @@
       name="min_score"
       value="{{ min_score }}"
       min="0" max="100" size="4"
-      hx-get="/"
+      hx-get="/p/{{ active.slug }}/"
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"
@@ -35,7 +35,7 @@
       name="remote_only"
       value="true"
       {% if remote_only %}checked{% endif %}
-      hx-get="/"
+      hx-get="/p/{{ active.slug }}/"
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"
@@ -54,7 +54,7 @@
     posted within
     <select
       name="max_age_days"
-      hx-get="/"
+      hx-get="/p/{{ active.slug }}/"
       hx-trigger="change"
       hx-target="#job-tbody"
       hx-swap="innerHTML"

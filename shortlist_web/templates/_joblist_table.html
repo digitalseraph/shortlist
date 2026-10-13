@@ -5,7 +5,7 @@
   {% if is_active %}{% set arrow = " ▼" if dir == "desc" else " ▲" %}{% endif %}
   <th class="sortable {% if is_active %}sort-active{% endif %} {{ classes }}">
     <a href="#"
-       hx-get="/?sort={{ col }}&dir={{ new_dir }}"
+       hx-get="/p/{{ active.slug }}/?sort={{ col }}&dir={{ new_dir }}"
        hx-target="#joblist-wrap"
        hx-swap="outerHTML"
        hx-push-url="true"

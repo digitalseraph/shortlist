@@ -69,7 +69,7 @@
     fd.append('status', to);
     let resp;
     try {
-      resp = await fetch(`/applications/move/${jobId}`, {
+      resp = await fetch(`/p/${KANBAN_SLUG}/applications/move/${jobId}`, {
         method: 'POST',
         body: fd,
       });

@@ -12,7 +12,7 @@
   </p>
 
   {% if allowed_next %}
-  <form method="post" action="/track/{{ job.id }}" class="track-form">
+  <form method="post" action="/p/{{ active.slug }}/track/{{ job.id }}" class="track-form">
     <label>
       move to
       <select name="status">

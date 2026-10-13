@@ -7,12 +7,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader
 
-from shortlist import paths
+from shortlist.profiles import Profile
 from shortlist.store import db as store_db
+from shortlist_web.routes._shared import page_context, profile_dep
 
 router = APIRouter()
 
@@ -149,7 +150,7 @@ def _aggregate(db_path: Path) -> dict[str, object]:
 
 
 @router.get("/costs", response_class=HTMLResponse)
-def costs(request: Request) -> HTMLResponse:
-    ctx = {"request": request, **_aggregate(paths.db_path())}
+def costs(request: Request, profile: Profile = Depends(profile_dep)) -> HTMLResponse:
+    ctx = page_context(request, profile, **_aggregate(profile.db_path))
     html = _get_env(request).get_template("costs.html").render(**ctx)
     return HTMLResponse(html)

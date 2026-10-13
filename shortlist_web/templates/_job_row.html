@@ -2,7 +2,7 @@
   <td class="select"><input type="checkbox" class="job-select" name="job_ids" value="{{ row.id }}"></td>
   <td class="score">{{ row.score_display }}</td>
   <td>{{ row.company }}</td>
-  <td><a href="/job/{{ row.id }}">{{ row.title }}</a></td>
+  <td><a href="/p/{{ active.slug }}/job/{{ row.id }}">{{ row.title }}</a></td>
   <td class="dim">{{ row.location }}</td>
   <td class="comp">{{ row.comp_display }}</td>
   <td class="dim">{{ row.posted_display }}</td>

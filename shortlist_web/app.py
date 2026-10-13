@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import importlib.resources as _ir
 from pathlib import Path
+from typing import Any, cast
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import RedirectResponse, Response
 
+from shortlist import profiles
 from shortlist_web.routes import actions, applications, costs, jobs, settings
+
+# Pages that existed before profiles were URL-scoped. A request for one of
+# these bare paths is sent to the active profile's version instead of 404ing.
+_BARE_PATHS = ("/", "/applications", "/costs", "/settings", "/resume")
 
 
 def create_app() -> FastAPI:
@@ -29,10 +36,26 @@ def create_app() -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-    app.include_router(jobs.router)
-    app.include_router(applications.router)
-    app.include_router(costs.router)
+    @app.middleware("http")
+    async def _redirect_bare_paths(request: Request, call_next: Any) -> Response:
+        """Send unprefixed page requests to the active profile, or to first-run setup."""
+        path = request.url.path
+        if path not in _BARE_PATHS:
+            # call_next is typed Any (its real type lives in starlette.middleware.base
+            # and varies across versions); cast narrows it back to our declared return type.
+            return cast(Response, await call_next(request))
+        try:
+            active = profiles.resolve()
+        except profiles.ProfileError:
+            return RedirectResponse("/profiles/new", status_code=307)
+        suffix = "" if path == "/" else path
+        return RedirectResponse(f"/p/{active.slug}{suffix}", status_code=307)
+
+    # profiles.router and resume.router land in later tasks; settings.router and
+    # actions.router convert to the prefix in their own tasks too.
     app.include_router(settings.router)
     app.include_router(actions.router)
+    for router in (jobs.router, applications.router, costs.router):
+        app.include_router(router, prefix="/p/{slug}")
 
     return app

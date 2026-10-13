@@ -75,7 +75,7 @@
     <tr>
       <td class="dim">{{ t.rendered_at.strftime("%Y-%m-%d %H:%M") if t.rendered_at else "—" }}</td>
       <td>{{ t.company }}</td>
-      <td><a href="/job/{{ t.job_id }}">{{ t.title }}</a></td>
+      <td><a href="/p/{{ active.slug }}/job/{{ t.job_id }}">{{ t.title }}</a></td>
       <td class="comp">${{ "%.4f"|format(t.cost_usd) }}</td>
       <td class="dim">{{ t.tokens_in }}/{{ t.tokens_out }}</td>
     </tr>
