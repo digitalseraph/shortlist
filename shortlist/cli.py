@@ -19,7 +19,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from shortlist import paths
+from shortlist import paths, profiles
 from shortlist.config import DEFAULT_CONFIG_YAML, DEFAULT_PREFS_YAML, Prefs, load_prefs
 from shortlist.sources.ats.ashby import AshbySource
 from shortlist.sources.ats.greenhouse import GreenhouseSource
@@ -54,6 +54,63 @@ from shortlist.tracker.state import InvalidStatusTransitionError
 app = typer.Typer(no_args_is_help=True, help="Shortlist — personal job search.")
 console = Console()
 
+
+def _resolve(explicit: str | None) -> profiles.Profile:
+    """Resolve the active profile or exit with a useful message."""
+    try:
+        return profiles.resolve(explicit)
+    except profiles.ProfileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+
+# --- profile subgroup ------------------------------------------------------
+
+profile_app = typer.Typer(help="Manage people tracked in this installation.")
+app.add_typer(profile_app, name="profile")
+
+
+@profile_app.command("list")
+def profile_list() -> None:
+    """List every profile."""
+    found = profiles.list_profiles()
+    if not found:
+        typer.echo("no profiles yet — create one with `shortlist profile create <slug>`")
+        return
+    for prof in found:
+        typer.echo(f"{prof.slug}\t{prof.display_name}")
+
+
+@profile_app.command("create")
+def profile_create(
+    slug: str = typer.Argument(...),
+    name: str = typer.Option(..., "--name", help="Display name, e.g. 'David'"),
+) -> None:
+    """Create a profile with an empty database."""
+    try:
+        prof = profiles.create(slug, name)
+    except profiles.ProfileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"created {prof.slug} at {prof.db_path.parent}")
+
+
+@profile_app.command("delete")
+def profile_delete(
+    slug: str = typer.Argument(...),
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt."),
+) -> None:
+    """Delete a profile, its database and its cost history."""
+    if not yes:
+        typer.confirm(f"Delete profile {slug!r} and all of its data?", abort=True)
+    try:
+        profiles.delete(slug)
+    except profiles.ProfileNotFoundError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"deleted {slug}")
+
+
 # --- db subgroup ----------------------------------------------------------
 
 db_app = typer.Typer(help="Database admin.")
@@ -61,18 +118,24 @@ app.add_typer(db_app, name="db")
 
 
 @db_app.command("init")
-def db_init() -> None:
+def db_init(
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """Create the SQLite database and apply migrations."""
-    target = paths.db_path()
+    prof = _resolve(profile)
+    target = prof.db_path
     target.parent.mkdir(parents=True, exist_ok=True)
     store_db.migrate(target)
     console.print(f"[green]ok[/green] db at {target}")
 
 
 @db_app.command("status")
-def db_status() -> None:
+def db_status(
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """Print schema version + db location."""
-    target = paths.db_path()
+    prof = _resolve(profile)
+    target = prof.db_path
     if not target.exists():
         console.print(f"db not present at {target}")
         console.print("schema version: 0")
@@ -83,9 +146,12 @@ def db_status() -> None:
 
 
 @db_app.command("backup")
-def db_backup() -> None:
+def db_backup(
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """Copy the SQLite file to a timestamped backup."""
-    src = paths.db_path()
+    prof = _resolve(profile)
+    src = prof.db_path
     if not src.exists():
         console.print(f"[yellow]no db at {src}[/yellow]")
         raise typer.Exit(code=1)
@@ -104,11 +170,14 @@ app.add_typer(config_app, name="config")
 
 
 @config_app.command("init")
-def config_init() -> None:
-    """Write default config.yaml and prefs.yaml if not present."""
+def config_init(
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
+    """Write default config.yaml if not present; repair a profile's prefs.yaml."""
+    prof = _resolve(profile)
     paths.config_dir().mkdir(parents=True, exist_ok=True)
     cfg_path = paths.config_path()
-    prefs_path = paths.prefs_path()
+    prefs_path = prof.prefs_path
     wrote: list[Path] = []
     if not cfg_path.exists():
         cfg_path.write_text(DEFAULT_CONFIG_YAML)
@@ -130,9 +199,12 @@ def config_init() -> None:
 
 
 @config_app.command("show")
-def config_show() -> None:
-    """Print current config.yaml + prefs.yaml."""
-    for p in (paths.config_path(), paths.prefs_path()):
+def config_show(
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
+    """Print current config.yaml + the profile's prefs.yaml."""
+    prof = _resolve(profile)
+    for p in (paths.config_path(), prof.prefs_path):
         if not p.exists():
             console.print(f"[yellow]missing[/yellow] {p}")
             continue
@@ -179,17 +251,20 @@ def _build_sources(prefs: Prefs) -> list[Source]:
 
 
 @app.command("fetch")
-def fetch() -> None:
+def fetch(
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """Pull jobs from all enabled sources."""
-    if not paths.prefs_path().exists():
+    prof = _resolve(profile)
+    if not prof.prefs_path.exists():
         console.print("[red]error[/red] run `shortlist config init` first")
         raise typer.Exit(code=2)
-    if not paths.db_path().exists():
+    if not prof.db_path.exists():
         console.print("[red]error[/red] run `shortlist db init` first")
         raise typer.Exit(code=2)
 
-    prefs = load_prefs(paths.prefs_path())
-    db = paths.db_path()
+    prefs = load_prefs(prof.prefs_path)
+    db = prof.db_path
 
     total = 0
     for src in _build_sources(prefs):
@@ -232,18 +307,20 @@ from shortlist.tailor.orchestrator import TailorOrchestrator  # noqa: E402
 def rank(
     top_k: int = typer.Option(30, "--top-k", help="Cosine pre-rank size."),
     no_llm: bool = typer.Option(False, "--no-llm", help="Skip Haiku rerank ($0)."),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
 ) -> None:
     """Score stored jobs: hard filter → cosine top-K → Haiku rerank."""
-    if not paths.prefs_path().exists() or not paths.config_path().exists():
+    prof = _resolve(profile)
+    if not prof.prefs_path.exists() or not paths.config_path().exists():
         console.print("[red]error[/red] run `shortlist config init` first")
         raise typer.Exit(code=2)
-    if not paths.db_path().exists():
+    if not prof.db_path.exists():
         console.print("[red]error[/red] run `shortlist db init` first")
         raise typer.Exit(code=2)
 
     cfg = load_config(paths.config_path())
-    prefs = load_prefs(paths.prefs_path())
-    resume = cfg.paths.resume.expanduser()
+    prefs = load_prefs(prof.prefs_path)
+    resume = prof.resume_path
     if not resume.exists():
         console.print(f"[red]error[/red] resume not found at {resume}")
         raise typer.Exit(code=2)
@@ -266,7 +343,7 @@ def rank(
             )
 
     summary = run_pipeline(
-        paths.db_path(),
+        prof.db_path,
         prefs=prefs,
         resume_path=resume,
         embedder=embedder,
@@ -283,18 +360,20 @@ def rank(
 def tailor_cmd(
     job_id: int = typer.Argument(..., help="Job id to tailor materials for."),
     cover_paragraphs: int = typer.Option(3, "--cover-paras"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
 ) -> None:
     """Generate per-job resume + cover + notes (Markdown + PDF)."""
-    if not paths.config_path().exists() or not paths.prefs_path().exists():
+    prof = _resolve(profile)
+    if not paths.config_path().exists() or not prof.prefs_path.exists():
         console.print("[red]error[/red] run `shortlist config init` first")
         raise typer.Exit(code=2)
-    if not paths.db_path().exists():
+    if not prof.db_path.exists():
         console.print("[red]error[/red] run `shortlist db init` first")
         raise typer.Exit(code=2)
 
     cfg = load_config(paths.config_path())
-    prefs = load_prefs(paths.prefs_path())
-    resume = cfg.paths.resume.expanduser()
+    prefs = load_prefs(prof.prefs_path)
+    resume = prof.resume_path
     if not resume.exists():
         console.print(f"[red]error[/red] resume not found at {resume}")
         raise typer.Exit(code=2)
@@ -307,8 +386,8 @@ def tailor_cmd(
         raise typer.Exit(code=2)
 
     orch = TailorOrchestrator(
-        db_path=paths.db_path(),
-        output_root=cfg.paths.output_dir.expanduser(),
+        db_path=prof.db_path,
+        output_root=prof.output_dir,
         anthropic_client=Anthropic(api_key=key),
         model=cfg.tailor.model,
         pdf_template=cfg.paths.pdf_template,
@@ -350,12 +429,14 @@ def _format_comp(comp_min: int | None, comp_max: int | None) -> str:
 def list_jobs_cmd(
     min_score: int = typer.Option(0, "--min-score", help="Hide jobs scoring below."),
     limit: int = typer.Option(50, "--limit", help="Max rows to print."),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
 ) -> None:
     """Print stored jobs as a table, ordered by score DESC."""
-    if not paths.db_path().exists():
+    prof = _resolve(profile)
+    if not prof.db_path.exists():
         console.print("[red]error[/red] run `shortlist db init` first")
         raise typer.Exit(code=2)
-    rows = store_db.list_jobs(paths.db_path(), min_score=min_score, limit=limit)
+    rows = store_db.list_jobs(prof.db_path, min_score=min_score, limit=limit)
     if not rows:
         console.print("[dim]no jobs[/dim]")
         return
@@ -387,13 +468,15 @@ def track_cmd(
     status: str = typer.Option(..., "--status", help="Target status."),
     notes: str | None = typer.Option(None, "--notes"),
     applied_via: str | None = typer.Option(None, "--applied-via"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
 ) -> None:
     """Transition a job through the application lifecycle."""
-    if not paths.db_path().exists():
+    prof = _resolve(profile)
+    if not prof.db_path.exists():
         console.print("[red]error[/red] run `shortlist db init` first")
         raise typer.Exit(code=2)
     try:
-        transition_status(paths.db_path(), job_id, status)  # type: ignore[arg-type]
+        transition_status(prof.db_path, job_id, status)  # type: ignore[arg-type]
     except InvalidStatusTransitionError as e:
         console.print(f"[red]error[/red] {e}")
         raise typer.Exit(code=1) from e
@@ -403,13 +486,13 @@ def track_cmd(
 
     if status == "applied":
         update_application(
-            paths.db_path(),
+            prof.db_path,
             job_id,
             applied_at=datetime.now(UTC),
             applied_via=applied_via or "(unspecified)",
         )
     if notes:
-        update_application(paths.db_path(), job_id, lessons=notes)
+        update_application(prof.db_path, job_id, lessons=notes)
     console.print(f"[green]ok[/green] job {job_id} → {status}")
 
 
@@ -426,10 +509,12 @@ def contacts_add(
     email: str | None = typer.Option(None, "--email"),
     role: str | None = typer.Option(None, "--role"),
     source: str | None = typer.Option(None, "--source"),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
 ) -> None:
     """Add a contact to a job application."""
+    prof = _resolve(profile)
     cid = store_add_contact(
-        paths.db_path(),
+        prof.db_path,
         job_id,
         name=name,
         email=email,
@@ -440,9 +525,13 @@ def contacts_add(
 
 
 @contacts_app.command("list")
-def contacts_list(job_id: int = typer.Argument(...)) -> None:
+def contacts_list(
+    job_id: int = typer.Argument(...),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """List contacts for a job application."""
-    rows = store_list_contacts(paths.db_path(), job_id)
+    prof = _resolve(profile)
+    rows = store_list_contacts(prof.db_path, job_id)
     if not rows:
         console.print("[dim]no contacts[/dim]")
         return
@@ -458,9 +547,13 @@ def contacts_list(job_id: int = typer.Argument(...)) -> None:
 
 
 @contacts_app.command("remove")
-def contacts_remove(contact_id: int = typer.Argument(...)) -> None:
+def contacts_remove(
+    contact_id: int = typer.Argument(...),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """Remove a contact by id."""
-    store_remove_contact(paths.db_path(), contact_id)
+    prof = _resolve(profile)
+    store_remove_contact(prof.db_path, contact_id)
     console.print(f"[green]removed[/green] contact {contact_id}")
 
 
@@ -471,21 +564,28 @@ app.add_typer(sources_app, name="sources")
 
 
 @sources_app.command("clear-cooldown")
-def sources_clear_cooldown(name: str = typer.Argument(...)) -> None:
+def sources_clear_cooldown(
+    name: str = typer.Argument(...),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """Clear the cooldown timestamp for a source."""
-    store_db.clear_source_cooldown(paths.db_path(), name)
+    prof = _resolve(profile)
+    store_db.clear_source_cooldown(prof.db_path, name)
     console.print(f"[green]cleared[/green] cooldown for {name}")
 
 
 @sources_app.command("status")
-def sources_status() -> None:
+def sources_status(
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """Print fetch + cooldown state for every source."""
+    prof = _resolve(profile)
     table = Table(show_header=True, header_style="bold")
     table.add_column("Source")
     table.add_column("Last fetched")
     table.add_column("Cooldown until")
     table.add_column("Last error")
-    with store_db.connect(paths.db_path()) as conn:
+    with store_db.connect(prof.db_path) as conn:
         rows = conn.execute(
             "SELECT name, last_fetched_at, cooldown_until, last_error FROM sources ORDER BY name"
         ).fetchall()

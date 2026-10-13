@@ -7,6 +7,7 @@ import pytest
 import respx
 from typer.testing import CliRunner
 
+from shortlist import profiles
 from shortlist.cli import app
 
 runner = CliRunner()
@@ -22,14 +23,18 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     data.mkdir()
     monkeypatch.setenv("SHORTLIST_CONFIG_HOME", str(cfg))
     monkeypatch.setenv("SHORTLIST_DATA_HOME", str(data))
-    return cfg, data
+    monkeypatch.delenv("SHORTLIST_PROFILE", raising=False)
+    # A single profile so every command below resolves it automatically.
+    prof = profiles.create("david", "David")
+    return cfg, data, prof
 
 
 def test_db_init_creates_sqlite_file(env):
-    cfg, data = env
+    cfg, data, prof = env
+    prof.db_path.unlink()  # created by profiles.create(); start from "missing"
     result = runner.invoke(app, ["db", "init"])
     assert result.exit_code == 0, result.output
-    assert (data / "db.sqlite").exists()
+    assert prof.db_path.exists()
 
 
 def test_db_init_is_idempotent(env):
@@ -46,13 +51,15 @@ def test_db_status_reports_version(env):
 
 
 def test_db_status_when_uninitialized(env):
+    _, _, prof = env
+    prof.db_path.unlink()
     result = runner.invoke(app, ["db", "status"])
     assert result.exit_code == 0
     assert "schema version: 0" in result.output.lower()
 
 
 def test_db_backup_creates_file(env):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["db", "init"])
     result = runner.invoke(app, ["db", "backup"])
     assert result.exit_code == 0
@@ -61,21 +68,23 @@ def test_db_backup_creates_file(env):
 
 
 def test_db_backup_errors_when_no_db(env):
+    _, _, prof = env
+    prof.db_path.unlink()
     result = runner.invoke(app, ["db", "backup"])
     assert result.exit_code == 1
 
 
 def test_config_init_writes_default_files(env):
-    cfg, data = env
+    cfg, data, prof = env
     result = runner.invoke(app, ["config", "init"])
     assert result.exit_code == 0, result.output
     assert (cfg / "config.yaml").exists()
-    assert (cfg / "prefs.yaml").exists()
+    assert prof.prefs_path.exists()
     assert (cfg / "pdf-template.tex").exists()
 
 
 def test_config_init_does_not_overwrite(env):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
     (cfg / "config.yaml").write_text("# user-edited\n")
     result = runner.invoke(app, ["config", "init"])
@@ -92,17 +101,13 @@ def test_config_show_after_init(env):
 
 @respx.mock
 def test_fetch_persists_jobs(env):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
-    prefs_yaml = (
-        (cfg / "prefs.yaml")
-        .read_text()
-        .replace(
-            "greenhouse_companies: []",
-            "greenhouse_companies:\n  - acme",
-        )
+    prefs_yaml = prof.prefs_path.read_text().replace(
+        "greenhouse_companies: []",
+        "greenhouse_companies:\n  - acme",
     )
-    (cfg / "prefs.yaml").write_text(prefs_yaml)
+    prof.prefs_path.write_text(prefs_yaml)
     runner.invoke(app, ["db", "init"])
 
     payload = json.loads((FIXTURES / "greenhouse_acme_page1.json").read_text())
@@ -122,12 +127,10 @@ def test_fetch_persists_jobs(env):
 
 @respx.mock
 def test_fetch_handles_source_error_gracefully(env):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
-    (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml")
-        .read_text()
-        .replace(
+    prof.prefs_path.write_text(
+        prof.prefs_path.read_text().replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - nopecorp",
         )
@@ -147,22 +150,15 @@ def test_fetch_handles_source_error_gracefully(env):
 
 @respx.mock
 def test_rank_no_llm_runs_pipeline(env, tmp_path, monkeypatch):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
-    (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml")
-        .read_text()
-        .replace(
+    prof.prefs_path.write_text(
+        prof.prefs_path.read_text().replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - acme",
         )
     )
-    resume = tmp_path / "resume.md"
-    resume.write_text("Senior backend engineer with Python.")
-    cfg_text = (
-        (cfg / "config.yaml").read_text().replace("resume: ~/jobs/resume.md", f"resume: {resume}")
-    )
-    (cfg / "config.yaml").write_text(cfg_text)
+    prof.resume_path.write_text("Senior backend engineer with Python.")
 
     from unittest.mock import MagicMock
 
@@ -197,21 +193,15 @@ def test_rank_no_llm_runs_pipeline(env, tmp_path, monkeypatch):
 
 @respx.mock
 def test_list_shows_top_jobs(env, tmp_path, monkeypatch):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
-    (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml")
-        .read_text()
-        .replace(
+    prof.prefs_path.write_text(
+        prof.prefs_path.read_text().replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - acme",
         )
     )
-    resume = tmp_path / "resume.md"
-    resume.write_text("Senior backend engineer with Python.")
-    (cfg / "config.yaml").write_text(
-        (cfg / "config.yaml").read_text().replace("resume: ~/jobs/resume.md", f"resume: {resume}")
-    )
+    prof.resume_path.write_text("Senior backend engineer with Python.")
 
     from unittest.mock import MagicMock
 
@@ -246,7 +236,7 @@ def test_list_shows_top_jobs(env, tmp_path, monkeypatch):
 
 
 def test_list_min_score_filter(env):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
     runner.invoke(app, ["db", "init"])
     result = runner.invoke(app, ["list", "--min-score", "1"])
@@ -256,9 +246,9 @@ def test_list_min_score_filter(env):
 
 @respx.mock
 def test_fetch_iterates_all_configured_sources(env):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
-    prefs_yaml = (cfg / "prefs.yaml").read_text()
+    prefs_yaml = prof.prefs_path.read_text()
     prefs_yaml = (
         prefs_yaml.replace(
             "greenhouse_companies: []",
@@ -273,7 +263,7 @@ def test_fetch_iterates_all_configured_sources(env):
             "ashby_companies:\n  - acme",
         )
     )
-    (cfg / "prefs.yaml").write_text(prefs_yaml)
+    prof.prefs_path.write_text(prefs_yaml)
     runner.invoke(app, ["db", "init"])
 
     gh = json.loads((FIXTURES / "greenhouse_acme_page1.json").read_text())
@@ -298,26 +288,15 @@ def test_fetch_iterates_all_configured_sources(env):
 
 
 def test_cli_tailor_writes_outputs(env, tmp_path, monkeypatch):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
-    (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml")
-        .read_text()
-        .replace(
+    prof.prefs_path.write_text(
+        prof.prefs_path.read_text().replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - acme",
         )
     )
-    resume = tmp_path / "resume.md"
-    resume.write_text("R")
-    out_dir = tmp_path / "jobs"
-    cfg_text = (
-        (cfg / "config.yaml")
-        .read_text()
-        .replace("resume: ~/jobs/resume.md", f"resume: {resume}")
-        .replace("output_dir: ~/jobs", f"output_dir: {out_dir}")
-    )
-    (cfg / "config.yaml").write_text(cfg_text)
+    prof.resume_path.write_text("R")
 
     runner.invoke(app, ["db", "init"])
     from datetime import UTC, datetime
@@ -326,7 +305,7 @@ def test_cli_tailor_writes_outputs(env, tmp_path, monkeypatch):
     from shortlist.store.db import upsert_job
 
     j = upsert_job(
-        data / "db.sqlite",
+        prof.db_path,
         RawJob(
             source="greenhouse",
             external_id="acme:1",
@@ -356,14 +335,14 @@ def test_cli_tailor_writes_outputs(env, tmp_path, monkeypatch):
 
     result = runner.invoke(app, ["tailor", str(j.id)])
     assert result.exit_code == 0, result.output
-    dirs = list(out_dir.iterdir())
+    dirs = list(prof.output_dir.iterdir())
     assert len(dirs) == 1
     files = {p.name for p in dirs[0].iterdir()}
     assert {"resume.md", "cover.md", "notes.md"} <= files
 
 
 def test_track_status_transition(env, tmp_path):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
     runner.invoke(app, ["db", "init"])
     from datetime import UTC, datetime
@@ -372,7 +351,7 @@ def test_track_status_transition(env, tmp_path):
     from shortlist.store.db import upsert_job
 
     j = upsert_job(
-        data / "db.sqlite",
+        prof.db_path,
         RawJob(
             source="greenhouse",
             external_id="acme:1",
@@ -395,7 +374,7 @@ def test_track_status_transition(env, tmp_path):
 
 
 def test_contacts_add_list_remove(env, tmp_path):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
     runner.invoke(app, ["db", "init"])
     from datetime import UTC, datetime
@@ -404,7 +383,7 @@ def test_contacts_add_list_remove(env, tmp_path):
     from shortlist.store.db import upsert_job
 
     j = upsert_job(
-        data / "db.sqlite",
+        prof.db_path,
         RawJob(
             source="greenhouse",
             external_id="acme:1",
@@ -447,12 +426,10 @@ def test_cli_tui_help_does_not_error(env):
 
 
 def test_fetch_skips_source_in_cooldown(env, monkeypatch):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
-    (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml")
-        .read_text()
-        .replace(
+    prof.prefs_path.write_text(
+        prof.prefs_path.read_text().replace(
             "indeed_queries: []",
             "indeed_queries:\n  - python backend",
         )
@@ -463,7 +440,7 @@ def test_fetch_skips_source_in_cooldown(env, monkeypatch):
     from shortlist.store.db import mark_source_cooldown
 
     mark_source_cooldown(
-        data / "db.sqlite",
+        prof.db_path,
         "indeed",
         until=datetime.now(UTC) + timedelta(hours=24),
     )
@@ -478,34 +455,31 @@ def test_fetch_skips_source_in_cooldown(env, monkeypatch):
 
 
 def test_sources_clear_cooldown_cli(env):
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["db", "init"])
     from datetime import UTC, datetime, timedelta
 
     from shortlist.store.db import is_source_in_cooldown, mark_source_cooldown
 
-    mark_source_cooldown(
-        data / "db.sqlite", "indeed", until=datetime.now(UTC) + timedelta(hours=24)
-    )
-    assert is_source_in_cooldown(data / "db.sqlite", "indeed") is True
+    mark_source_cooldown(prof.db_path, "indeed", until=datetime.now(UTC) + timedelta(hours=24))
+    assert is_source_in_cooldown(prof.db_path, "indeed") is True
 
     result = runner.invoke(app, ["sources", "clear-cooldown", "indeed"])
     assert result.exit_code == 0
-    assert is_source_in_cooldown(data / "db.sqlite", "indeed") is False
+    assert is_source_in_cooldown(prof.db_path, "indeed") is False
 
 
 def test_fetch_with_curated_sources_runs_no_errors(env, monkeypatch):
     """Smoke: enabling HN + RemoteOK + RSS doesn't crash fetch (mocked)."""
-    cfg, data = env
+    cfg, data, prof = env
     runner.invoke(app, ["config", "init"])
     prefs_yaml = (
-        (cfg / "prefs.yaml")
-        .read_text()
+        prof.prefs_path.read_text()
         .replace("hn_enabled: false", "hn_enabled: true")
         .replace("remoteok_enabled: false", "remoteok_enabled: true")
         .replace("rss_urls: []", "rss_urls:\n  - https://example.invalid/feed.rss")
     )
-    (cfg / "prefs.yaml").write_text(prefs_yaml)
+    prof.prefs_path.write_text(prefs_yaml)
     runner.invoke(app, ["db", "init"])
 
     class _Stub:

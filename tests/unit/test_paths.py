@@ -14,8 +14,3 @@ def test_env_overrides_config_dir(tmp_path, monkeypatch):
 def test_env_overrides_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("SHORTLIST_DATA_HOME", str(tmp_path))
     assert paths.data_dir() == tmp_path
-
-
-def test_db_path_under_data_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("SHORTLIST_DATA_HOME", str(tmp_path))
-    assert paths.db_path() == tmp_path / "db.sqlite"
