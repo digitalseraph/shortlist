@@ -112,9 +112,7 @@ def test_migrate_to_v3_creates_applications_and_contacts(db_path: Path):
     migrate(db_path)
     assert current_version(db_path) == 3
     with connect(db_path) as conn:
-        names = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )}
+        names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "applications" in names
     assert "contacts" in names
     assert "tailor_outputs" in names
@@ -194,8 +192,7 @@ def test_application_with_decision():
 
 def test_contact_requires_name():
     with pytest.raises(ValidationError):
-        Contact(application_id=1, name="", role="recruiter",
-                created_at=datetime.now(UTC))
+        Contact(application_id=1, name="", role="recruiter", created_at=datetime.now(UTC))
 
 
 def test_contact_minimum_fields():
@@ -324,18 +321,19 @@ Linear-with-branches: new → tailored → applied → screen → interview → 
                       Terminal states (offer, rejected, withdrawn) have no
                       outgoing transitions.
 """
+
 from __future__ import annotations
 
 from shortlist.models import JobStatus
 
 _GRAPH: dict[JobStatus, set[JobStatus]] = {
-    "new":       {"tailored", "withdrawn"},
-    "tailored":  {"applied", "withdrawn"},
-    "applied":   {"screen", "rejected", "withdrawn"},
-    "screen":    {"interview", "rejected", "withdrawn"},
+    "new": {"tailored", "withdrawn"},
+    "tailored": {"applied", "withdrawn"},
+    "applied": {"screen", "rejected", "withdrawn"},
+    "screen": {"interview", "rejected", "withdrawn"},
     "interview": {"offer", "rejected", "withdrawn"},
-    "offer":     set(),
-    "rejected":  set(),
+    "offer": set(),
+    "rejected": set(),
     "withdrawn": set(),
 }
 
@@ -353,8 +351,7 @@ def validate_transition(current: JobStatus, target: JobStatus) -> None:
         raise InvalidStatusTransitionError(f"unknown status {target!r}")
     if target not in allowed_next(current):
         raise InvalidStatusTransitionError(
-            f"cannot transition {current!r} → {target!r}; "
-            f"allowed: {sorted(allowed_next(current))}"
+            f"cannot transition {current!r} → {target!r}; allowed: {sorted(allowed_next(current))}"
         )
 ```
 
@@ -407,10 +404,14 @@ def db_path(tmp_path: Path) -> Path:
 
 def _raw(eid: str = "gh_1") -> RawJob:
     return RawJob(
-        source="greenhouse", external_id=eid, company="Acme",
-        title="Senior Backend Engineer", url="https://example.com/" + eid,
+        source="greenhouse",
+        external_id=eid,
+        company="Acme",
+        title="Senior Backend Engineer",
+        url="https://example.com/" + eid,
         posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote - US", remote=True,
+        location="Remote - US",
+        remote=True,
     )
 
 
@@ -419,6 +420,7 @@ def test_transition_status_updates_jobs_row(db_path):
     job = upsert_job(db_path, _raw())
     transition_status(db_path, job.id, "tailored")
     from shortlist.store.db import list_jobs
+
     refreshed = next(j for j in list_jobs(db_path) if j.id == job.id)
     assert refreshed.status == "tailored"
     assert refreshed.status_changed_at is not None
@@ -426,6 +428,7 @@ def test_transition_status_updates_jobs_row(db_path):
 
 def test_transition_status_rejects_invalid(db_path):
     from shortlist.tracker.state import InvalidStatusTransitionError
+
     migrate(db_path)
     job = upsert_job(db_path, _raw())
     with pytest.raises(InvalidStatusTransitionError):
@@ -436,7 +439,8 @@ def test_update_application_creates_then_updates(db_path):
     migrate(db_path)
     job = upsert_job(db_path, _raw())
     update_application(
-        db_path, job.id,
+        db_path,
+        job.id,
         applied_at=datetime(2026, 4, 28, 12, 0, tzinfo=UTC),
         applied_via="company website",
     )
@@ -450,10 +454,8 @@ def test_update_application_creates_then_updates(db_path):
 def test_contact_add_list_remove(db_path):
     migrate(db_path)
     job = upsert_job(db_path, _raw())
-    update_application(db_path, job.id,
-                       applied_at=datetime(2026, 4, 28, 12, 0, tzinfo=UTC))
-    cid = add_contact(db_path, job.id, name="Jane Doe", email="jane@acme.com",
-                      role="recruiter")
+    update_application(db_path, job.id, applied_at=datetime(2026, 4, 28, 12, 0, tzinfo=UTC))
+    cid = add_contact(db_path, job.id, name="Jane Doe", email="jane@acme.com", role="recruiter")
     rows = list_contacts(db_path, job.id)
     assert len(rows) == 1
     assert rows[0].name == "Jane Doe"
@@ -464,10 +466,12 @@ def test_contact_add_list_remove(db_path):
 
 def test_log_event_records_transition(db_path):
     import sqlite3
+
     migrate(db_path)
     job = upsert_job(db_path, _raw())
-    log_event(db_path, job_id=job.id, type="status.transition",
-              payload={"from": "new", "to": "tailored"})
+    log_event(
+        db_path, job_id=job.id, type="status.transition", payload={"from": "new", "to": "tailored"}
+    )
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
             "SELECT type, payload_json FROM events WHERE job_id = ?", (job.id,)
@@ -491,7 +495,10 @@ Append helpers:
 
 ```python
 def transition_status(
-    path: Path, job_id: int, target: JobStatus, *,
+    path: Path,
+    job_id: int,
+    target: JobStatus,
+    *,
     when: datetime | None = None,
 ) -> None:
     """Validate + apply a status transition; record an event."""
@@ -508,10 +515,13 @@ def transition_status(
             (target, _utc_iso(when), job_id),
         )
         conn.execute(
-            "INSERT INTO events (job_id, type, payload_json, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (job_id, "status.transition",
-             json.dumps({"from": current, "to": target}), _utc_iso(when)),
+            "INSERT INTO events (job_id, type, payload_json, created_at) VALUES (?, ?, ?, ?)",
+            (
+                job_id,
+                "status.transition",
+                json.dumps({"from": current, "to": target}),
+                _utc_iso(when),
+            ),
         )
 
 
@@ -539,9 +549,7 @@ def update_application(path: Path, job_id: int, **fields: object) -> None:
 def get_application(path: Path, job_id: int) -> Application | None:
     with connect(path) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM applications WHERE job_id = ?", (job_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM applications WHERE job_id = ?", (job_id,)).fetchone()
     if row is None:
         return None
     return Application(
@@ -563,9 +571,13 @@ def _parse_dt(s: str | None) -> datetime | None:
 
 
 def add_contact(
-    path: Path, application_id: int, *,
-    name: str, email: str | None = None,
-    role: str | None = None, source: str | None = None,
+    path: Path,
+    application_id: int,
+    *,
+    name: str,
+    email: str | None = None,
+    role: str | None = None,
+    source: str | None = None,
     when: datetime | None = None,
 ) -> int:
     when = when or datetime.now(UTC)
@@ -587,8 +599,12 @@ def list_contacts(path: Path, application_id: int) -> list[Contact]:
         ).fetchall()
     return [
         Contact(
-            id=r["id"], application_id=r["application_id"],
-            name=r["name"], email=r["email"], role=r["role"], source=r["source"],
+            id=r["id"],
+            application_id=r["application_id"],
+            name=r["name"],
+            email=r["email"],
+            role=r["role"],
+            source=r["source"],
             created_at=_parse_dt(r["created_at"]) or datetime.now(UTC),
         )
         for r in rows
@@ -601,9 +617,13 @@ def remove_contact(path: Path, contact_id: int) -> None:
 
 
 def log_event(
-    path: Path, *, job_id: int | None, type: str,
+    path: Path,
+    *,
+    job_id: int | None,
+    type: str,
     payload: dict[str, object] | None = None,
-    cost_usd: float | None = None, tokens: int | None = None,
+    cost_usd: float | None = None,
+    tokens: int | None = None,
     when: datetime | None = None,
 ) -> None:
     when = when or datetime.now(UTC)
@@ -746,13 +766,13 @@ The model is instructed to emit:
 This parser splits the response on those headings (case-insensitive,
 exact level-1 H1) and returns the bodies. Missing any section raises.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 
-_SECTION_RE = re.compile(r"^#\s+(RESUME|COVER|NOTES)\s*$",
-                         re.IGNORECASE | re.MULTILINE)
+_SECTION_RE = re.compile(r"^#\s+(RESUME|COVER|NOTES)\s*$", re.IGNORECASE | re.MULTILINE)
 
 
 class TailorParseError(ValueError):
@@ -872,8 +892,12 @@ def test_sonnet_tailor_retries_on_parse_failure():
     ]
     client = SonnetTailorClient(client=fake_client, model="claude-sonnet-4-6")
     req = TailorRequest(
-        resume="r", prefs_summary="p", job_title="t", company="c",
-        job_description="d", cover_paragraphs=3,
+        resume="r",
+        prefs_summary="p",
+        job_title="t",
+        company="c",
+        job_description="d",
+        cover_paragraphs=3,
     )
     result = client.tailor(req)
     assert "David Miller" in result.sections.resume
@@ -884,6 +908,7 @@ def test_sonnet_tailor_retries_on_parse_failure():
 
 ```python
 """Sonnet tailor prompts. Strict no-fabrication guardrail in the system prompt."""
+
 from __future__ import annotations
 
 SYSTEM = (
@@ -902,8 +927,13 @@ SYSTEM = (
 
 
 def build_user_prompt(
-    *, resume: str, prefs_summary: str, job_title: str,
-    company: str, job_description: str, cover_paragraphs: int,
+    *,
+    resume: str,
+    prefs_summary: str,
+    job_title: str,
+    company: str,
+    job_description: str,
+    cover_paragraphs: int,
 ) -> str:
     return (
         f"# CANDIDATE RESUME\n\n{resume.strip()}\n\n"
@@ -928,6 +958,7 @@ Pricing (USD per 1M tokens, public Anthropic pricing as of 2026-01):
   Sonnet 4.6 input  : $3.00
   Sonnet 4.6 output : $15.00
 """
+
 from __future__ import annotations
 
 import logging
@@ -973,21 +1004,23 @@ class TailorResult:
 
 
 class SonnetTailorClient:
-    def __init__(self, *, client: Any, model: str = "claude-sonnet-4-6",
-                 max_tokens: int = 8192):
+    def __init__(self, *, client: Any, model: str = "claude-sonnet-4-6", max_tokens: int = 8192):
         self._client = client
         self._model = model
         self._max_tokens = max_tokens
 
     def tailor(self, req: TailorRequest) -> TailorResult:
         user = build_user_prompt(
-            resume=req.resume, prefs_summary=req.prefs_summary,
-            job_title=req.job_title, company=req.company,
+            resume=req.resume,
+            prefs_summary=req.prefs_summary,
+            job_title=req.job_title,
+            company=req.company,
             job_description=req.job_description,
             cover_paragraphs=req.cover_paragraphs,
         )
         msg = self._client.messages.create(
-            model=self._model, max_tokens=self._max_tokens,
+            model=self._model,
+            max_tokens=self._max_tokens,
             system=SYSTEM,
             messages=[{"role": "user", "content": user}],
         )
@@ -1004,7 +1037,8 @@ class SonnetTailorClient:
                 "# NOTES. No prose outside them."
             )
             msg2 = self._client.messages.create(
-                model=self._model, max_tokens=self._max_tokens,
+                model=self._model,
+                max_tokens=self._max_tokens,
                 system=SYSTEM + "\n" + corrective,
                 messages=[
                     {"role": "user", "content": user},
@@ -1018,7 +1052,8 @@ class SonnetTailorClient:
         return TailorResult(
             sections=sections,
             cost_usd=estimate_tailor_cost(input_tokens=in_tok, output_tokens=out_tok),
-            tokens_in=in_tok, tokens_out=out_tok,
+            tokens_in=in_tok,
+            tokens_out=out_tok,
         )
 ```
 
@@ -1076,8 +1111,9 @@ def _have(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
 
-@pytest.mark.skipif(not (_have("pandoc") and _have("pdflatex")),
-                    reason="pandoc + pdflatex required")
+@pytest.mark.skipif(
+    not (_have("pandoc") and _have("pdflatex")), reason="pandoc + pdflatex required"
+)
 def test_render_md_to_pdf_writes_pdf(tmp_path: Path):
     md = tmp_path / "in.md"
     md.write_text("# Hello\n\nThis is a test.\n")
@@ -1104,6 +1140,7 @@ def test_render_md_to_pdf_raises_when_pandoc_missing(tmp_path: Path, monkeypatch
 If pandoc or pdflatex is missing on PATH, raise PandocMissingError. Callers
 treat that as a soft failure — MD outputs are still useful.
 """
+
 from __future__ import annotations
 
 import logging
@@ -1130,7 +1167,10 @@ def _check_tools() -> None:
 
 
 def render_md_to_pdf(
-    md_path: Path, pdf_path: Path, *, template: Path | None = None,
+    md_path: Path,
+    pdf_path: Path,
+    *,
+    template: Path | None = None,
 ) -> None:
     _check_tools()
     cmd = ["pandoc", str(md_path), "-o", str(pdf_path), "--pdf-engine=pdflatex"]
@@ -1184,36 +1224,50 @@ def _fake_msg(text):
 
 
 def _prefs() -> Prefs:
-    return Prefs.model_validate(dict(
-        titles=["Senior Backend Engineer"], locations=["Remote"], remote_ok=True,
-        comp_floor_usd=180000, exclude_keywords=[], seniority=["senior"],
-        greenhouse_companies=[],
-    ))
+    return Prefs.model_validate(
+        dict(
+            titles=["Senior Backend Engineer"],
+            locations=["Remote"],
+            remote_ok=True,
+            comp_floor_usd=180000,
+            exclude_keywords=[],
+            seniority=["senior"],
+            greenhouse_companies=[],
+        )
+    )
 
 
 def test_orchestrator_writes_three_md_files(tmp_path: Path):
     db = tmp_path / "db.sqlite"
     migrate(db)
-    job = upsert_job(db, RawJob(
-        source="greenhouse", external_id="acme:1", company="Acme Corp",
-        title="Senior Backend Engineer",
-        url="https://example.com/jobs/1",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote - US", remote=True,
-        description_md="Build distributed systems in Python.",
-    ))
+    job = upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme Corp",
+            title="Senior Backend Engineer",
+            url="https://example.com/jobs/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote - US",
+            remote=True,
+            description_md="Build distributed systems in Python.",
+        ),
+    )
     resume = tmp_path / "resume.md"
     resume.write_text("Senior backend engineer with 6 years Python.")
     output_root = tmp_path / "jobs"
 
-    fixture = (Path(__file__).parent.parent /
-               "fixtures/llm_responses/sonnet_tailor_sample.md")
+    fixture = Path(__file__).parent.parent / "fixtures/llm_responses/sonnet_tailor_sample.md"
     fake_anth = MagicMock()
     fake_anth.messages.create.return_value = _fake_msg(fixture.read_text())
 
     orch = TailorOrchestrator(
-        db_path=db, output_root=output_root, anthropic_client=fake_anth,
-        model="claude-sonnet-4-6", pdf_template=None,
+        db_path=db,
+        output_root=output_root,
+        anthropic_client=fake_anth,
+        model="claude-sonnet-4-6",
+        pdf_template=None,
     )
     result = orch.tailor(job_id=job.id, resume_path=resume, prefs=_prefs())
 
@@ -1227,28 +1281,38 @@ def test_orchestrator_writes_three_md_files(tmp_path: Path):
 def test_orchestrator_records_status_transition(tmp_path: Path):
     db = tmp_path / "db.sqlite"
     migrate(db)
-    job = upsert_job(db, RawJob(
-        source="greenhouse", external_id="acme:2", company="Acme",
-        title="Senior Backend Engineer",
-        url="https://example.com/jobs/2",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote", remote=True, description_md="Python work.",
-    ))
+    job = upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="acme:2",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/jobs/2",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+            description_md="Python work.",
+        ),
+    )
     resume = tmp_path / "resume.md"
     resume.write_text("R")
 
-    fixture = (Path(__file__).parent.parent /
-               "fixtures/llm_responses/sonnet_tailor_sample.md")
+    fixture = Path(__file__).parent.parent / "fixtures/llm_responses/sonnet_tailor_sample.md"
     fake_anth = MagicMock()
     fake_anth.messages.create.return_value = _fake_msg(fixture.read_text())
 
     orch = TailorOrchestrator(
-        db_path=db, output_root=tmp_path / "jobs", anthropic_client=fake_anth,
-        model="claude-sonnet-4-6", pdf_template=None,
+        db_path=db,
+        output_root=tmp_path / "jobs",
+        anthropic_client=fake_anth,
+        model="claude-sonnet-4-6",
+        pdf_template=None,
     )
     orch.tailor(job_id=job.id, resume_path=resume, prefs=_prefs())
 
     from shortlist.store.db import list_jobs
+
     refreshed = next(j for j in list_jobs(db) if j.id == job.id)
     assert refreshed.status == "tailored"
 ```
@@ -1257,6 +1321,7 @@ def test_orchestrator_records_status_transition(tmp_path: Path):
 
 ```python
 """Tailor orchestrator: load → Sonnet → parse → write 3 MD + 2 PDFs → record."""
+
 from __future__ import annotations
 
 import logging
@@ -1300,9 +1365,14 @@ def _prefs_summary(prefs: Prefs) -> str:
 
 class TailorOrchestrator:
     def __init__(
-        self, *, db_path: Path, output_root: Path,
-        anthropic_client: Any, model: str = "claude-sonnet-4-6",
-        pdf_template: Path | None = None, cover_paragraphs: int = 3,
+        self,
+        *,
+        db_path: Path,
+        output_root: Path,
+        anthropic_client: Any,
+        model: str = "claude-sonnet-4-6",
+        pdf_template: Path | None = None,
+        cover_paragraphs: int = 3,
     ):
         self._db = db_path
         self._root = output_root
@@ -1311,7 +1381,11 @@ class TailorOrchestrator:
         self._cover_paragraphs = cover_paragraphs
 
     def tailor(
-        self, *, job_id: int, resume_path: Path, prefs: Prefs,
+        self,
+        *,
+        job_id: int,
+        resume_path: Path,
+        prefs: Prefs,
     ) -> TailorOutput:
         jobs = [j for j in store_db.list_jobs(self._db) if j.id == job_id]
         if not jobs:
@@ -1351,24 +1425,33 @@ class TailorOrchestrator:
                 "INSERT OR REPLACE INTO tailor_outputs "
                 "(job_id, output_dir, rendered_at, cost_usd, tokens_in, tokens_out) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                (job_id, str(out_dir),
-                 store_db._utc_iso(datetime.now(UTC)),
-                 result.cost_usd, result.tokens_in, result.tokens_out),
+                (
+                    job_id,
+                    str(out_dir),
+                    store_db._utc_iso(datetime.now(UTC)),
+                    result.cost_usd,
+                    result.tokens_in,
+                    result.tokens_out,
+                ),
             )
 
         # Transition status if currently `new`.
         if job.status == "new":
             store_db.transition_status(self._db, job_id, "tailored")
         store_db.log_event(
-            self._db, job_id=job_id, type="tailor.complete",
+            self._db,
+            job_id=job_id,
+            type="tailor.complete",
             payload={"output_dir": str(out_dir)},
             cost_usd=result.cost_usd,
             tokens=result.tokens_in + result.tokens_out,
         )
 
         return TailorOutput(
-            output_dir=out_dir, cost_usd=result.cost_usd,
-            tokens_in=result.tokens_in, tokens_out=result.tokens_out,
+            output_dir=out_dir,
+            cost_usd=result.cost_usd,
+            tokens_in=result.tokens_in,
+            tokens_out=result.tokens_out,
         )
 ```
 
@@ -1399,7 +1482,9 @@ def test_cli_tailor_writes_outputs(env, tmp_path, monkeypatch):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml").read_text().replace(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - acme",
         )
@@ -1407,35 +1492,46 @@ def test_cli_tailor_writes_outputs(env, tmp_path, monkeypatch):
     resume = tmp_path / "resume.md"
     resume.write_text("R")
     out_dir = tmp_path / "jobs"
-    cfg_text = (cfg / "config.yaml").read_text()\
-        .replace("resume: ~/jobs/resume.md", f"resume: {resume}")\
+    cfg_text = (
+        (cfg / "config.yaml")
+        .read_text()
+        .replace("resume: ~/jobs/resume.md", f"resume: {resume}")
         .replace("output_dir: ~/jobs", f"output_dir: {out_dir}")
+    )
     (cfg / "config.yaml").write_text(cfg_text)
 
     runner.invoke(app, ["db", "init"])
     from datetime import UTC, datetime
     from shortlist.models import RawJob
     from shortlist.store.db import upsert_job
-    j = upsert_job(data / "db.sqlite", RawJob(
-        source="greenhouse", external_id="acme:1", company="Acme Corp",
-        title="Senior Backend Engineer",
-        url="https://example.com/1",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote - US", remote=True,
-        description_md="Python services.",
-    ))
+
+    j = upsert_job(
+        data / "db.sqlite",
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme Corp",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote - US",
+            remote=True,
+            description_md="Python services.",
+        ),
+    )
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key")
     from unittest.mock import MagicMock
+
     fake_anth = MagicMock()
     msg = MagicMock()
-    fixture = (Path(__file__).parent.parent /
-               "fixtures/llm_responses/sonnet_tailor_sample.md")
+    fixture = Path(__file__).parent.parent / "fixtures/llm_responses/sonnet_tailor_sample.md"
     msg.content = [MagicMock(text=fixture.read_text())]
     msg.usage.input_tokens = 1500
     msg.usage.output_tokens = 1200
     fake_anth.messages.create.return_value = msg
     import shortlist.cli as cli_mod
+
     monkeypatch.setattr(cli_mod, "Anthropic", lambda **_kw: fake_anth)
 
     result = runner.invoke(app, ["tailor", str(j.id)])
@@ -1475,6 +1571,7 @@ def tailor_cmd(
         raise typer.Exit(code=2)
 
     import os
+
     key = os.environ.get(cfg.anthropic.key_env_var, "")
     if not key:
         console.print(f"[red]error[/red] {cfg.anthropic.key_env_var} not set")
@@ -1489,8 +1586,10 @@ def tailor_cmd(
         cover_paragraphs=cover_paragraphs,
     )
     out = orch.tailor(job_id=job_id, resume_path=resume, prefs=prefs)
-    console.print(f"[green]wrote[/green] {out.output_dir} "
-                  f"(${out.cost_usd:.4f}, {out.tokens_in + out.tokens_out} tok)")
+    console.print(
+        f"[green]wrote[/green] {out.output_dir} "
+        f"(${out.cost_usd:.4f}, {out.tokens_in + out.tokens_out} tok)"
+    )
 ```
 
 - [ ] **Step 3: Run + commit**
@@ -1523,17 +1622,25 @@ def test_track_status_transition(env, tmp_path):
     from datetime import UTC, datetime
     from shortlist.models import RawJob
     from shortlist.store.db import upsert_job
-    j = upsert_job(data / "db.sqlite", RawJob(
-        source="greenhouse", external_id="acme:1", company="Acme",
-        title="Senior Backend Engineer",
-        url="https://example.com/1",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote", remote=True,
-    ))
+
+    j = upsert_job(
+        data / "db.sqlite",
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+        ),
+    )
     result = runner.invoke(app, ["track", str(j.id), "--status", "tailored"])
     assert result.exit_code == 0
-    result = runner.invoke(app, ["track", str(j.id), "--status", "applied",
-                                  "--applied-via", "company website"])
+    result = runner.invoke(
+        app, ["track", str(j.id), "--status", "applied", "--applied-via", "company website"]
+    )
     assert result.exit_code == 0
     result = runner.invoke(app, ["track", str(j.id), "--status", "interview"])
     assert result.exit_code != 0
@@ -1546,20 +1653,37 @@ def test_contacts_add_list_remove(env, tmp_path):
     from datetime import UTC, datetime
     from shortlist.models import RawJob
     from shortlist.store.db import upsert_job
-    j = upsert_job(data / "db.sqlite", RawJob(
-        source="greenhouse", external_id="acme:1", company="Acme",
-        title="Senior Backend Engineer",
-        url="https://example.com/1",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote", remote=True,
-    ))
+
+    j = upsert_job(
+        data / "db.sqlite",
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+        ),
+    )
     runner.invoke(app, ["track", str(j.id), "--status", "tailored"])
     runner.invoke(app, ["track", str(j.id), "--status", "applied"])
 
-    result = runner.invoke(app, ["contacts", "add", str(j.id),
-                                  "--name", "Jane Doe",
-                                  "--email", "jane@acme.com",
-                                  "--role", "recruiter"])
+    result = runner.invoke(
+        app,
+        [
+            "contacts",
+            "add",
+            str(j.id),
+            "--name",
+            "Jane Doe",
+            "--email",
+            "jane@acme.com",
+            "--role",
+            "recruiter",
+        ],
+    )
     assert result.exit_code == 0
 
     result = runner.invoke(app, ["contacts", "list", str(j.id)])
@@ -1602,7 +1726,8 @@ def track_cmd(
 
     if status == "applied":
         update_application(
-            paths.db_path(), job_id,
+            paths.db_path(),
+            job_id,
             applied_at=datetime.now(timezone.utc),
             applied_via=applied_via or "(unspecified)",
         )
@@ -1624,7 +1749,12 @@ def contacts_add(
     source: str | None = typer.Option(None, "--source"),
 ) -> None:
     cid = store_add_contact(
-        paths.db_path(), job_id, name=name, email=email, role=role, source=source,
+        paths.db_path(),
+        job_id,
+        name=name,
+        email=email,
+        role=role,
+        source=source,
     )
     console.print(f"[green]added[/green] contact {cid} ({name})")
 

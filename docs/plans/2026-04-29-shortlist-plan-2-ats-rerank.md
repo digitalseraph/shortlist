@@ -151,9 +151,12 @@ def test_migrate_to_v2_creates_embeddings_tables(db_path: Path):
     migrate(db_path)
     assert current_version(db_path) == 2
     with connect(db_path) as conn:
-        names = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type IN ('table','virtual')"
-        )}
+        names = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table','virtual')"
+            )
+        }
     assert "job_embeddings" in names
     assert "resume_embeddings" in names
     assert "scoring_runs" in names
@@ -206,6 +209,7 @@ from shortlist.ranker.embeddings import (
 def fake_model():
     """Deterministic fake SentenceTransformer."""
     m = MagicMock()
+
     def _encode(text, **_):
         if isinstance(text, str):
             text = [text]
@@ -217,6 +221,7 @@ def fake_model():
             v /= np.linalg.norm(v)
             out.append(v)
         return np.array(out)
+
     m.encode = _encode
     m.get_sentence_embedding_dimension.return_value = 384
     return m
@@ -246,14 +251,17 @@ def test_resume_cache_skips_re_embed_when_mtime_unchanged(tmp_path, fake_model):
     db = tmp_path / "shortlist.sqlite"
 
     from shortlist.store.db import migrate
+
     migrate(db)
 
     svc = EmbeddingService(_model=fake_model)
     encode_calls: list[str] = []
     orig_encode = fake_model.encode
+
     def _spy(text, **kw):
         encode_calls.append(text)
         return orig_encode(text, **kw)
+
     fake_model.encode = _spy
 
     v1 = embed_resume_cached(db, resume, service=svc)
@@ -264,11 +272,13 @@ def test_resume_cache_skips_re_embed_when_mtime_unchanged(tmp_path, fake_model):
 
 def test_resume_cache_recomputes_when_mtime_changes(tmp_path, fake_model):
     import os
+
     resume = tmp_path / "resume.md"
     resume.write_text("v1")
     db = tmp_path / "shortlist.sqlite"
 
     from shortlist.store.db import migrate
+
     migrate(db)
 
     svc = EmbeddingService(_model=fake_model)
@@ -280,9 +290,11 @@ def test_resume_cache_recomputes_when_mtime_changes(tmp_path, fake_model):
 
     encode_calls: list[str] = []
     orig = fake_model.encode
+
     def _spy(text, **kw):
         encode_calls.append(text)
         return orig(text, **kw)
+
     fake_model.encode = _spy
 
     embed_resume_cached(db, resume, service=svc)
@@ -301,6 +313,7 @@ Loads a sentence-transformers model lazily and exposes:
 
 Tests inject a `_model` to avoid downloading the real ~90 MB model.
 """
+
 from __future__ import annotations
 
 import os
@@ -348,8 +361,7 @@ def embed_resume_cached(
 
     with connect(db_path) as conn:
         row = conn.execute(
-            "SELECT vector FROM resume_embeddings "
-            "WHERE path = ? AND mtime = ? AND model = ?",
+            "SELECT vector FROM resume_embeddings WHERE path = ? AND mtime = ? AND model = ?",
             (str(resume_path), mtime, model),
         ).fetchone()
         if row is not None:
@@ -390,6 +402,7 @@ Expected: 5 new pass + 55 prior = 60 total.
 def test_upsert_embedding_round_trips(db_path: Path):
     from shortlist.store.db import upsert_embedding, get_embedding
     import numpy as np
+
     migrate(db_path)
     job = upsert_job(db_path, _raw())
     vec = np.arange(384, dtype=np.float32) / 384.0
@@ -402,6 +415,7 @@ def test_upsert_embedding_round_trips(db_path: Path):
 def test_cosine_top_k_returns_ordered_job_ids(db_path: Path):
     from shortlist.store.db import upsert_embedding, cosine_top_k
     import numpy as np
+
     migrate(db_path)
     j1 = upsert_job(db_path, _raw("gh_1", title="Senior Backend Engineer"))
     j2 = upsert_job(db_path, _raw("gh_2", title="Frontend Engineer"))
@@ -411,7 +425,7 @@ def test_cosine_top_k_returns_ordered_job_ids(db_path: Path):
     target = rng.standard_normal(384).astype("float32")
     target /= np.linalg.norm(target)
 
-    near = (target + rng.standard_normal(384).astype("float32") * 0.01)
+    near = target + rng.standard_normal(384).astype("float32") * 0.01
     near /= np.linalg.norm(near)
     far = -target
 
@@ -452,9 +466,7 @@ def get_embedding(path: Path, job_id: int) -> np.ndarray | None:
     return np.frombuffer(row[0], dtype=np.float32).copy()
 
 
-def cosine_top_k(
-    path: Path, query: np.ndarray, *, k: int = 30
-) -> list[tuple[int, float]]:
+def cosine_top_k(path: Path, query: np.ndarray, *, k: int = 30) -> list[tuple[int, float]]:
     """Return up to k (job_id, distance) ordered by ascending vec0 distance.
 
     sqlite-vec uses L2 by default; on normalized vectors L2-rank ≡ cosine-rank,
@@ -563,10 +575,18 @@ def test_reranker_parses_valid_json_response():
         resume="Senior backend engineer.",
         prefs_summary="Python, Postgres.",
         candidates=[
-            {"id": 1, "title": "Senior Backend Engineer", "company": "Acme",
-             "description": "Build distributed systems in Python."},
-            {"id": 2, "title": "Platform Engineer", "company": "Globex",
-             "description": "Kubernetes platform work."},
+            {
+                "id": 1,
+                "title": "Senior Backend Engineer",
+                "company": "Acme",
+                "description": "Build distributed systems in Python.",
+            },
+            {
+                "id": 2,
+                "title": "Platform Engineer",
+                "company": "Globex",
+                "description": "Kubernetes platform work.",
+            },
         ],
     )
     result = rr.rerank(req)
@@ -588,7 +608,8 @@ def test_reranker_retries_once_on_unparsable_output():
 
     rr = LLMReranker(client=fake_client, model="claude-haiku-4-5-20251001")
     req = RerankRequest(
-        resume="r", prefs_summary="p",
+        resume="r",
+        prefs_summary="p",
         candidates=[{"id": 1, "title": "Eng", "company": "Acme", "description": "x"}],
     )
     result = rr.rerank(req)
@@ -599,6 +620,7 @@ def test_reranker_retries_once_on_unparsable_output():
 
 def test_reranker_raises_after_two_failed_parses():
     from shortlist.ranker.llm_rerank import LLMRerankParseError
+
     fake_client = MagicMock()
     fake_client.messages.create.side_effect = [
         _fake_message("garbage 1"),
@@ -606,7 +628,8 @@ def test_reranker_raises_after_two_failed_parses():
     ]
     rr = LLMReranker(client=fake_client, model="claude-haiku-4-5-20251001")
     req = RerankRequest(
-        resume="r", prefs_summary="p",
+        resume="r",
+        prefs_summary="p",
         candidates=[{"id": 1, "title": "Eng", "company": "Acme", "description": "x"}],
     )
     with pytest.raises(LLMRerankParseError):
@@ -629,6 +652,7 @@ Pricing (USD per 1M tokens, public Anthropic pricing as of 2026-01):
   Haiku 4.5 input  : $0.80
   Haiku 4.5 output : $4.00
 """
+
 from __future__ import annotations
 
 import json
@@ -705,23 +729,25 @@ def _extract_json_array(text: str) -> list[dict[str, Any]]:
 
 def _build_user_prompt(req: RerankRequest) -> str:
     lines = [
-        "RESUME:", req.resume.strip(),
+        "RESUME:",
+        req.resume.strip(),
         "",
-        "PREFERENCES:", req.prefs_summary.strip(),
+        "PREFERENCES:",
+        req.prefs_summary.strip(),
         "",
         "CANDIDATES (rank these):",
     ]
     for c in req.candidates:
         lines.append(
-            f"- id={c['id']} | {c['company']} — {c['title']}\n"
-            f"  {c.get('description', '')[:600]}"
+            f"- id={c['id']} | {c['company']} — {c['title']}\n  {c.get('description', '')[:600]}"
         )
     return "\n".join(lines)
 
 
 class LLMReranker:
-    def __init__(self, *, client: Any, model: str = "claude-haiku-4-5-20251001",
-                 max_tokens: int = 4096):
+    def __init__(
+        self, *, client: Any, model: str = "claude-haiku-4-5-20251001", max_tokens: int = 4096
+    ):
         self._client = client
         self._model = model
         self._max_tokens = max_tokens
@@ -908,6 +934,7 @@ Endpoint:
 
 Response is a flat JSON array of posting dicts.
 """
+
 from __future__ import annotations
 
 import logging
@@ -958,6 +985,7 @@ class LeverClient:
 
     def __del__(self) -> None:
         from contextlib import suppress
+
         with suppress(Exception):
             self._client.close()
 
@@ -1078,9 +1106,9 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 @respx.mock
 def test_ashby_client_returns_jobs():
     payload = json.loads((FIXTURES / "ashby_acme.json").read_text())
-    respx.get(
-        re.compile(r"^https://api\.ashbyhq\.com/posting-api/job-board/acme")
-    ).mock(return_value=httpx.Response(200, json=payload))
+    respx.get(re.compile(r"^https://api\.ashbyhq\.com/posting-api/job-board/acme")).mock(
+        return_value=httpx.Response(200, json=payload)
+    )
     out = list(AshbyClient().fetch_company("acme"))
     assert len(out) == 2
     assert out[0]["id"] == "ash-uuid-1"
@@ -1127,9 +1155,9 @@ def test_normalize_handles_missing_comp():
 @respx.mock
 def test_ashby_source_yields_namespaced_external_id():
     payload = json.loads((FIXTURES / "ashby_acme.json").read_text())
-    respx.get(
-        re.compile(r"^https://api\.ashbyhq\.com/posting-api/job-board/acme")
-    ).mock(return_value=httpx.Response(200, json=payload))
+    respx.get(re.compile(r"^https://api\.ashbyhq\.com/posting-api/job-board/acme")).mock(
+        return_value=httpx.Response(200, json=payload)
+    )
     src = AshbySource(companies={"acme": "Acme Corp"})
     out = list(src.fetch(since=None))
     assert out[0].external_id == "acme:ash-uuid-1"
@@ -1143,6 +1171,7 @@ def test_ashby_source_yields_namespaced_external_id():
 Endpoint:
   GET https://api.ashbyhq.com/posting-api/job-board/{board}?includeCompensation=true
 """
+
 from __future__ import annotations
 
 import html
@@ -1221,6 +1250,7 @@ class AshbyClient:
 
     def __del__(self) -> None:
         from contextlib import suppress
+
         with suppress(Exception):
             self._client.close()
 
@@ -1347,9 +1377,9 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 @respx.mock
 def test_workable_client_returns_jobs():
     payload = json.loads((FIXTURES / "workable_acme.json").read_text())
-    respx.get(
-        re.compile(r"^https://apply\.workable\.com/api/v1/widget/accounts/acme")
-    ).mock(return_value=httpx.Response(200, json=payload))
+    respx.get(re.compile(r"^https://apply\.workable\.com/api/v1/widget/accounts/acme")).mock(
+        return_value=httpx.Response(200, json=payload)
+    )
     out = list(WorkableClient().fetch_company("acme"))
     assert len(out) == 2
     assert out[0]["shortcode"] == "WRK001"
@@ -1359,8 +1389,11 @@ def test_normalize_combines_description_and_requirements():
     job = {
         "shortcode": "WRK001",
         "title": "Senior Backend Engineer",
-        "location": {"city": "Remote", "country": "United States",
-                     "location_str": "Remote, United States"},
+        "location": {
+            "city": "Remote",
+            "country": "United States",
+            "location_str": "Remote, United States",
+        },
         "application_url": "https://apply.workable.com/acme/j/WRK001/",
         "description": "<p>Build services.</p>",
         "requirements": "<p>5+ yrs.</p>",
@@ -1395,9 +1428,9 @@ def test_normalize_handles_missing_requirements():
 @respx.mock
 def test_workable_source_namespaces_external_id():
     payload = json.loads((FIXTURES / "workable_acme.json").read_text())
-    respx.get(
-        re.compile(r"^https://apply\.workable\.com/api/v1/widget/accounts/acme")
-    ).mock(return_value=httpx.Response(200, json=payload))
+    respx.get(re.compile(r"^https://apply\.workable\.com/api/v1/widget/accounts/acme")).mock(
+        return_value=httpx.Response(200, json=payload)
+    )
     src = WorkableSource(companies={"acme": "Acme Corp"})
     out = list(src.fetch(since=None))
     assert out[0].external_id == "acme:WRK001"
@@ -1411,6 +1444,7 @@ def test_workable_source_namespaces_external_id():
 Endpoint:
   GET https://apply.workable.com/api/v1/widget/accounts/{subdomain}?details=true
 """
+
 from __future__ import annotations
 
 import html
@@ -1471,6 +1505,7 @@ class WorkableClient:
 
     def __del__(self) -> None:
         from contextlib import suppress
+
         with suppress(Exception):
             self._client.close()
 
@@ -1612,9 +1647,9 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 @respx.mock
 def test_client_returns_postings():
     payload = json.loads((FIXTURES / "smartrecruiters_acme.json").read_text())
-    respx.get(
-        re.compile(r"^https://api\.smartrecruiters\.com/v1/companies/Acme/postings")
-    ).mock(return_value=httpx.Response(200, json=payload))
+    respx.get(re.compile(r"^https://api\.smartrecruiters\.com/v1/companies/Acme/postings")).mock(
+        return_value=httpx.Response(200, json=payload)
+    )
     out = list(SmartRecruitersClient().fetch_company("Acme"))
     assert len(out) == 2
     assert out[0]["id"] == "sr_001"
@@ -1622,16 +1657,36 @@ def test_client_returns_postings():
 
 @respx.mock
 def test_client_paginates():
-    page1 = {"offset": 0, "limit": 1, "totalFound": 2, "content": [
-        {"id": "a", "name": "A", "releasedDate": "2026-04-25T00:00:00.000Z",
-         "location": {"fullLocation": "Remote", "remote": True},
-         "jobAd": {"sections": {}}, "applyUrl": "https://x/a"}
-    ]}
-    page2 = {"offset": 1, "limit": 1, "totalFound": 2, "content": [
-        {"id": "b", "name": "B", "releasedDate": "2026-04-26T00:00:00.000Z",
-         "location": {"fullLocation": "Atlanta", "remote": False},
-         "jobAd": {"sections": {}}, "applyUrl": "https://x/b"}
-    ]}
+    page1 = {
+        "offset": 0,
+        "limit": 1,
+        "totalFound": 2,
+        "content": [
+            {
+                "id": "a",
+                "name": "A",
+                "releasedDate": "2026-04-25T00:00:00.000Z",
+                "location": {"fullLocation": "Remote", "remote": True},
+                "jobAd": {"sections": {}},
+                "applyUrl": "https://x/a",
+            }
+        ],
+    }
+    page2 = {
+        "offset": 1,
+        "limit": 1,
+        "totalFound": 2,
+        "content": [
+            {
+                "id": "b",
+                "name": "B",
+                "releasedDate": "2026-04-26T00:00:00.000Z",
+                "location": {"fullLocation": "Atlanta", "remote": False},
+                "jobAd": {"sections": {}},
+                "applyUrl": "https://x/b",
+            }
+        ],
+    }
     respx.get(
         "https://api.smartrecruiters.com/v1/companies/Acme/postings",
         params={"limit": "1", "offset": "0"},
@@ -1652,10 +1707,12 @@ def test_normalize_concatenates_sections():
         "name": "Senior Backend Engineer",
         "releasedDate": "2026-04-25T09:00:00.000Z",
         "location": {"fullLocation": "Remote, US", "remote": True},
-        "jobAd": {"sections": {
-            "jobDescription": {"text": "<p>Build.</p>"},
-            "qualifications": {"text": "<p>5y.</p>"},
-        }},
+        "jobAd": {
+            "sections": {
+                "jobDescription": {"text": "<p>Build.</p>"},
+                "qualifications": {"text": "<p>5y.</p>"},
+            }
+        },
         "applyUrl": "https://jobs.smartrecruiters.com/Acme/sr-uuid-1",
     }
     raw = _normalize(job, company="Acme")
@@ -1671,9 +1728,9 @@ def test_normalize_concatenates_sections():
 @respx.mock
 def test_source_namespaces_external_id():
     payload = json.loads((FIXTURES / "smartrecruiters_acme.json").read_text())
-    respx.get(
-        re.compile(r"^https://api\.smartrecruiters\.com/v1/companies/Acme/postings")
-    ).mock(return_value=httpx.Response(200, json=payload))
+    respx.get(re.compile(r"^https://api\.smartrecruiters\.com/v1/companies/Acme/postings")).mock(
+        return_value=httpx.Response(200, json=payload)
+    )
     src = SmartRecruitersSource(companies={"Acme": "Acme Corp"})
     out = list(src.fetch(since=None))
     assert out[0].external_id == "Acme:sr_001"
@@ -1691,6 +1748,7 @@ Endpoint:
 Returns {offset, limit, totalFound, content: [posting...]}. Paginate by
 offset until len(content) < limit.
 """
+
 from __future__ import annotations
 
 import html
@@ -1752,6 +1810,7 @@ class SmartRecruitersClient:
 
     def __del__(self) -> None:
         from contextlib import suppress
+
         with suppress(Exception):
             self._client.close()
 
@@ -1795,8 +1854,7 @@ class SmartRecruitersClient:
 class SmartRecruitersSource(Source):
     name: ClassVar[str] = "smartrecruiters"
 
-    def __init__(self, *, companies: dict[str, str],
-                 client: SmartRecruitersClient | None = None):
+    def __init__(self, *, companies: dict[str, str], client: SmartRecruitersClient | None = None):
         self._companies = companies
         self._client = client or SmartRecruitersClient()
 
@@ -1857,11 +1915,17 @@ def test_load_prefs_includes_all_ats_company_lists():
 
 
 def test_prefs_defaults_to_empty_lists_when_omitted():
-    p = Prefs.model_validate({
-        "titles": ["Eng"], "locations": ["Remote"], "remote_ok": True,
-        "comp_floor_usd": 100000, "exclude_keywords": [], "seniority": [],
-        "greenhouse_companies": [],
-    })
+    p = Prefs.model_validate(
+        {
+            "titles": ["Eng"],
+            "locations": ["Remote"],
+            "remote_ok": True,
+            "comp_floor_usd": 100000,
+            "exclude_keywords": [],
+            "seniority": [],
+            "greenhouse_companies": [],
+        }
+    )
     assert p.lever_companies == []
     assert p.ashby_companies == []
     assert p.workable_companies == []
@@ -1927,12 +1991,19 @@ def test_fetch_iterates_all_configured_sources(env):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     prefs_yaml = (cfg / "prefs.yaml").read_text()
-    prefs_yaml = prefs_yaml.replace(
-        "greenhouse_companies: []", "greenhouse_companies:\n  - acme",
-    ).replace(
-        "lever_companies: []", "lever_companies:\n  - acme",
-    ).replace(
-        "ashby_companies: []", "ashby_companies:\n  - acme",
+    prefs_yaml = (
+        prefs_yaml.replace(
+            "greenhouse_companies: []",
+            "greenhouse_companies:\n  - acme",
+        )
+        .replace(
+            "lever_companies: []",
+            "lever_companies:\n  - acme",
+        )
+        .replace(
+            "ashby_companies: []",
+            "ashby_companies:\n  - acme",
+        )
     )
     (cfg / "prefs.yaml").write_text(prefs_yaml)
     runner.invoke(app, ["db", "init"])
@@ -1948,9 +2019,9 @@ def test_fetch_iterates_all_configured_sources(env):
         "https://api.lever.co/v0/postings/acme",
         params={"mode": "json"},
     ).mock(return_value=httpx.Response(200, json=lever))
-    respx.get(
-        re.compile(r"^https://api\.ashbyhq\.com/posting-api/job-board/acme")
-    ).mock(return_value=httpx.Response(200, json=ashby))
+    respx.get(re.compile(r"^https://api\.ashbyhq\.com/posting-api/job-board/acme")).mock(
+        return_value=httpx.Response(200, json=ashby)
+    )
 
     result = runner.invoke(app, ["fetch"])
     assert result.exit_code == 0, result.output
@@ -1975,25 +2046,23 @@ from shortlist.sources.ats.workable import WorkableSource
 def _build_sources(prefs):  # type: ignore[no-untyped-def]
     sources = []
     if prefs.greenhouse_companies:
-        sources.append(GreenhouseSource(
-            companies={t: t.title() for t in prefs.greenhouse_companies}
-        ))
+        sources.append(
+            GreenhouseSource(companies={t: t.title() for t in prefs.greenhouse_companies})
+        )
     if prefs.lever_companies:
-        sources.append(LeverSource(
-            companies={t: t.title() for t in prefs.lever_companies}
-        ))
+        sources.append(LeverSource(companies={t: t.title() for t in prefs.lever_companies}))
     if prefs.ashby_companies:
-        sources.append(AshbySource(
-            companies={t: t.title() for t in prefs.ashby_companies}
-        ))
+        sources.append(AshbySource(companies={t: t.title() for t in prefs.ashby_companies}))
     if prefs.workable_companies:
-        sources.append(WorkableSource(
-            companies={t: t.title() for t in prefs.workable_companies}
-        ))
+        sources.append(WorkableSource(companies={t: t.title() for t in prefs.workable_companies}))
     if prefs.smartrecruiters_companies:
-        sources.append(SmartRecruitersSource(
-            companies={t: t for t in prefs.smartrecruiters_companies}  # SR uses identifier verbatim
-        ))
+        sources.append(
+            SmartRecruitersSource(
+                companies={
+                    t: t for t in prefs.smartrecruiters_companies
+                }  # SR uses identifier verbatim
+            )
+        )
     return sources
 
 
@@ -2054,6 +2123,7 @@ Stage 2: cosine pre-rank — embed surviving jobs, take top-K by sim to resume.
 Stage 3: Haiku rerank — let an LLM produce final 0–100 + one-line reason for top-K.
 Filtered-out jobs get score 0 + reason "filtered".
 """
+
 from __future__ import annotations
 
 import logging
@@ -2098,8 +2168,12 @@ def _prefs_summary(prefs: Prefs) -> str:
 
 def _candidates_for_llm(jobs: list[Job]) -> list[dict[str, Any]]:
     return [
-        {"id": j.id, "title": j.title, "company": j.company,
-         "description": (j.description_md or "")[:1000]}
+        {
+            "id": j.id,
+            "title": j.title,
+            "company": j.company,
+            "description": (j.description_md or "")[:1000],
+        }
         for j in jobs
     ]
 
@@ -2146,8 +2220,11 @@ def run_pipeline(
     for j in survivors:
         if j.id not in top_ids:
             store_db.update_score(
-                db_path, j.id, score=40,
-                reason="passed filter, below cosine top-K", model="cosine_only",
+                db_path,
+                j.id,
+                score=40,
+                reason="passed filter, below cosine top-K",
+                model="cosine_only",
             )
 
     # Stage 3: LLM rerank (if reranker provided).
@@ -2172,27 +2249,39 @@ def run_pipeline(
                 s = id_to_score.get(j.id)
                 if s is None:
                     store_db.update_score(
-                        db_path, j.id, score=50,
-                        reason="LLM omitted from result", model="cosine_then_llm",
+                        db_path,
+                        j.id,
+                        score=50,
+                        reason="LLM omitted from result",
+                        model="cosine_then_llm",
                     )
                 else:
                     store_db.update_score(
-                        db_path, j.id, score=s.score, reason=s.reason,
+                        db_path,
+                        j.id,
+                        score=s.score,
+                        reason=s.reason,
                         model="claude-haiku-4-5",
                     )
         except LLMRerankParseError as e:
             logger.warning("LLM rerank failed: %s — falling back to cosine scores", e)
             for j in top_jobs:
                 store_db.update_score(
-                    db_path, j.id, score=70,
-                    reason="cosine top-K (LLM fallback)", model="cosine_only",
+                    db_path,
+                    j.id,
+                    score=70,
+                    reason="cosine top-K (LLM fallback)",
+                    model="cosine_only",
                 )
     else:
         # No reranker — give top-K cosine score 70 placeholder.
         for j in top_jobs:
             store_db.update_score(
-                db_path, j.id, score=70,
-                reason="cosine top-K (no LLM)", model="cosine_only",
+                db_path,
+                j.id,
+                score=70,
+                reason="cosine top-K (no LLM)",
+                model="cosine_only",
             )
 
     # Record the run.
@@ -2238,46 +2327,62 @@ from shortlist.store.db import list_jobs, migrate, upsert_job
 @pytest.fixture
 def fake_embedder():
     m = MagicMock()
+
     def _encode(text, **_):
         seed = sum(ord(c) for c in (text if isinstance(text, str) else text[0]))
         rng = np.random.default_rng(seed)
         v = rng.standard_normal(384).astype("float32")
         return v / np.linalg.norm(v)
+
     m.encode = _encode
     m.get_sentence_embedding_dimension.return_value = 384
     return EmbeddingService(_model=m)
 
 
 def _prefs() -> Prefs:
-    return Prefs.model_validate(dict(
-        titles=["Senior Backend Engineer", "Staff Engineer"],
-        locations=["Remote - US", "Atlanta, GA"],
-        remote_ok=True,
-        comp_floor_usd=180000,
-        exclude_keywords=["C++"],
-        seniority=["senior", "staff"],
-        greenhouse_companies=["acme"],
-    ))
+    return Prefs.model_validate(
+        dict(
+            titles=["Senior Backend Engineer", "Staff Engineer"],
+            locations=["Remote - US", "Atlanta, GA"],
+            remote_ok=True,
+            comp_floor_usd=180000,
+            exclude_keywords=["C++"],
+            seniority=["senior", "staff"],
+            greenhouse_companies=["acme"],
+        )
+    )
 
 
 def _seed(db, n_pass=2, n_fail=1):
-    base = dict(source="greenhouse", company="Acme",
-                location="Remote - US", remote=True,
-                posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC))
+    base = dict(
+        source="greenhouse",
+        company="Acme",
+        location="Remote - US",
+        remote=True,
+        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+    )
     for i in range(n_pass):
-        upsert_job(db, RawJob(
-            **base, external_id=f"acme:p{i}",
-            title="Senior Backend Engineer",
-            url=f"https://example.com/p{i}",
-            description_md="Python services.",
-        ))
+        upsert_job(
+            db,
+            RawJob(
+                **base,
+                external_id=f"acme:p{i}",
+                title="Senior Backend Engineer",
+                url=f"https://example.com/p{i}",
+                description_md="Python services.",
+            ),
+        )
     for i in range(n_fail):
-        upsert_job(db, RawJob(
-            **base, external_id=f"acme:f{i}",
-            title="C++ Engineer",
-            url=f"https://example.com/f{i}",
-            description_md="Low-level work.",
-        ))
+        upsert_job(
+            db,
+            RawJob(
+                **base,
+                external_id=f"acme:f{i}",
+                title="C++ Engineer",
+                url=f"https://example.com/f{i}",
+                description_md="Low-level work.",
+            ),
+        )
 
 
 def test_pipeline_filters_then_cosine_then_llm(tmp_path, fake_embedder):
@@ -2289,16 +2394,24 @@ def test_pipeline_filters_then_cosine_then_llm(tmp_path, fake_embedder):
 
     fake_anth = MagicMock()
     msg = MagicMock()
-    msg.content = [MagicMock(text='[{"id": 1, "score": 88, "reason": "great match"}, '
-                                  '{"id": 2, "score": 71, "reason": "ok match"}]')]
+    msg.content = [
+        MagicMock(
+            text='[{"id": 1, "score": 88, "reason": "great match"}, '
+            '{"id": 2, "score": 71, "reason": "ok match"}]'
+        )
+    ]
     msg.usage.input_tokens = 500
     msg.usage.output_tokens = 30
     fake_anth.messages.create.return_value = msg
     reranker = LLMReranker(client=fake_anth, model="claude-haiku-4-5-20251001")
 
     summary = run_pipeline(
-        db, prefs=_prefs(), resume_path=resume,
-        embedder=fake_embedder, reranker=reranker, top_k=5,
+        db,
+        prefs=_prefs(),
+        resume_path=resume,
+        embedder=fake_embedder,
+        reranker=reranker,
+        top_k=5,
     )
     assert summary.filtered == 1
     assert summary.cosine_top_k >= 1
@@ -2319,8 +2432,12 @@ def test_pipeline_no_llm_path(tmp_path, fake_embedder):
     resume = tmp_path / "resume.md"
     resume.write_text("Senior backend engineer.")
     summary = run_pipeline(
-        db, prefs=_prefs(), resume_path=resume,
-        embedder=fake_embedder, reranker=None, top_k=5,
+        db,
+        prefs=_prefs(),
+        resume_path=resume,
+        embedder=fake_embedder,
+        reranker=None,
+        top_k=5,
     )
     assert summary.cost_usd == 0.0
     assert summary.llm_scored == 0
@@ -2360,6 +2477,7 @@ def rank(
     reranker: LLMReranker | None = None
     if not no_llm:
         import os
+
         key = os.environ.get(cfg.anthropic.key_env_var, "")
         if not key:
             console.print(
@@ -2367,14 +2485,19 @@ def rank(
             )
         else:
             from anthropic import Anthropic
+
             reranker = LLMReranker(
                 client=Anthropic(api_key=key),
                 model=cfg.ranker.rerank_model,
             )
 
     summary = run_pipeline(
-        paths.db_path(), prefs=prefs, resume_path=resume,
-        embedder=embedder, reranker=reranker, top_k=top_k,
+        paths.db_path(),
+        prefs=prefs,
+        resume_path=resume,
+        embedder=embedder,
+        reranker=reranker,
+        top_k=top_k,
     )
     console.print(
         f"ranked: filtered={summary.filtered}, cosine_top_k={summary.cosine_top_k}, "
@@ -2392,28 +2515,34 @@ def test_rank_no_llm_runs_pipeline(env, tmp_path, monkeypatch):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml").read_text().replace(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - acme",
         )
     )
     resume = tmp_path / "resume.md"
     resume.write_text("Senior backend engineer with Python.")
-    cfg_text = (cfg / "config.yaml").read_text().replace(
-        "resume: ~/jobs/resume.md", f"resume: {resume}"
+    cfg_text = (
+        (cfg / "config.yaml").read_text().replace("resume: ~/jobs/resume.md", f"resume: {resume}")
     )
     (cfg / "config.yaml").write_text(cfg_text)
 
     from unittest.mock import MagicMock
     import numpy as np
+
     fake = MagicMock()
+
     def _enc(t, **_):
         rng = np.random.default_rng(sum(ord(c) for c in (t if isinstance(t, str) else t[0])))
         v = rng.standard_normal(384).astype("float32")
         return v / np.linalg.norm(v)
+
     fake.encode = _enc
 
     import shortlist.ranker.embeddings as emb
+
     monkeypatch.setattr(emb, "_load_model", lambda *_a, **_k: fake)
 
     runner.invoke(app, ["db", "init"])

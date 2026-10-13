@@ -104,9 +104,7 @@ def is_source_in_cooldown(path: Path, name: str, *, now: datetime | None = None)
     """Return True if the source is currently cooled down."""
     now = now or datetime.now(UTC)
     with connect(path) as conn:
-        row = conn.execute(
-            "SELECT cooldown_until FROM sources WHERE name = ?", (name,)
-        ).fetchone()
+        row = conn.execute("SELECT cooldown_until FROM sources WHERE name = ?", (name,)).fetchone()
     if row is None or row[0] is None:
         return False
     until = datetime.fromisoformat(row[0].replace("Z", "+00:00"))
@@ -116,9 +114,7 @@ def is_source_in_cooldown(path: Path, name: str, *, now: datetime | None = None)
 def clear_source_cooldown(path: Path, name: str) -> None:
     """Reset cooldown_until for a source."""
     with connect(path) as conn:
-        conn.execute(
-            "UPDATE sources SET cooldown_until = NULL WHERE name = ?", (name,)
-        )
+        conn.execute("UPDATE sources SET cooldown_until = NULL WHERE name = ?", (name,))
 ```
 
 - [ ] **Step 4: Extend `Prefs` in `shortlist/config.py`**
@@ -194,11 +190,17 @@ Append a test for the new Prefs fields in `tests/unit/test_config.py`:
 
 ```python
 def test_prefs_includes_scraped_queries():
-    p = Prefs.model_validate({
-        "titles": ["Eng"], "locations": ["Remote"], "remote_ok": True,
-        "comp_floor_usd": 100000, "exclude_keywords": [], "seniority": [],
-        "greenhouse_companies": [],
-    })
+    p = Prefs.model_validate(
+        {
+            "titles": ["Eng"],
+            "locations": ["Remote"],
+            "remote_ok": True,
+            "comp_floor_usd": 100000,
+            "exclude_keywords": [],
+            "seniority": [],
+            "greenhouse_companies": [],
+        }
+    )
     assert p.indeed_queries == []
     assert p.linkedin_queries == []
     assert p.glassdoor_queries == []
@@ -243,6 +245,7 @@ This is best-effort — modern bot-detection (Cloudflare, Datadome,
 PerimeterX) layers behavioral fingerprinting on top of these basics.
 Sites WILL still detect us; the cooldown layer (T6) handles that.
 """
+
 from __future__ import annotations
 
 import logging
@@ -281,7 +284,9 @@ if (origQuery) {
 
 @asynccontextmanager
 async def headless_context(
-    *, user_agent: str = _UA, timeout_ms: int = 30_000,
+    *,
+    user_agent: str = _UA,
+    timeout_ms: int = 30_000,
 ) -> AsyncIterator[BrowserContext]:
     """Launch a stealth-patched Chromium context. Always headless."""
     async with async_playwright() as pw:
@@ -401,6 +406,7 @@ The Indeed source navigates to a search URL, waits for the results list, parses 
 
 ```python
 """Indeed scraped source."""
+
 from __future__ import annotations
 
 import asyncio
@@ -454,9 +460,8 @@ def _normalize_card(card: Tag) -> RawJob | None:
     href = str(title_a.get("href") or "")
     if href.startswith("/"):
         href = f"https://www.indeed.com{href}"
-    jk_match = (
-        re.search(r"jk=([a-zA-Z0-9]+)", href)
-        or re.search(r"job_([a-zA-Z0-9]+)", str(title_a.get("id") or ""))
+    jk_match = re.search(r"jk=([a-zA-Z0-9]+)", href) or re.search(
+        r"job_([a-zA-Z0-9]+)", str(title_a.get("id") or "")
     )
     if jk_match is None:
         return None
@@ -487,15 +492,15 @@ def parse_search_html(html: str, *, query: str) -> list[RawJob]:  # noqa: ARG001
     if any(m.lower() in html.lower() for m in _BAN_MARKERS):
         raise IndeedBanDetectedError("ban / captcha marker found in HTML")
     soup = BeautifulSoup(html, "html.parser")
-    return [rj for card in soup.select("li.result")
-            if (rj := _normalize_card(card)) is not None]
+    return [rj for card in soup.select("li.result") if (rj := _normalize_card(card)) is not None]
 
 
 class IndeedSource(Source):
     name: ClassVar[str] = "indeed"
 
-    def __init__(self, *, queries: list[str], location: str = "Remote",
-                 rate_limit_seconds: float = 8.0):
+    def __init__(
+        self, *, queries: list[str], location: str = "Remote", rate_limit_seconds: float = 8.0
+    ):
         self._queries = queries
         self._location = location
         self._rate = rate_limit_seconds
@@ -631,6 +636,7 @@ LinkedIn's public guest job search is at `https://www.linkedin.com/jobs/search?k
 
 ```python
 """LinkedIn public guest jobs search."""
+
 from __future__ import annotations
 
 import asyncio
@@ -651,8 +657,11 @@ logger = logging.getLogger(__name__)
 
 _BASE = "https://www.linkedin.com/jobs/search"
 _BAN_MARKERS = (
-    "authwall", "request a verification", "/checkpoint/challenge",
-    "rate limit", "Sign in to continue",
+    "authwall",
+    "request a verification",
+    "/checkpoint/challenge",
+    "rate limit",
+    "Sign in to continue",
 )
 
 
@@ -678,7 +687,8 @@ def _parse_card(card: Tag) -> RawJob | None:
     location = location_el.get_text(strip=True) if location_el else ""
     posted_at = (
         datetime.fromisoformat(str(date_el["datetime"])).replace(tzinfo=UTC)
-        if date_el is not None and date_el.get("datetime") else datetime.now(UTC)
+        if date_el is not None and date_el.get("datetime")
+        else datetime.now(UTC)
     )
     return RawJob(
         source="linkedin",
@@ -696,15 +706,24 @@ def parse_search_html(html: str) -> list[RawJob]:
     if any(m.lower() in html.lower() for m in _BAN_MARKERS):
         raise LinkedInBanDetectedError("ban / authwall marker found")
     soup = BeautifulSoup(html, "html.parser")
-    return [rj for card in soup.select("ul.jobs-search__results-list > li")
-            if (rj := _parse_card(card)) is not None]
+    return [
+        rj
+        for card in soup.select("ul.jobs-search__results-list > li")
+        if (rj := _parse_card(card)) is not None
+    ]
 
 
 class LinkedInSource(Source):
     name: ClassVar[str] = "linkedin"
 
-    def __init__(self, *, queries: list[str], location: str = "United States",
-                 rate_limit_seconds: float = 15.0, max_pages: int = 2):
+    def __init__(
+        self,
+        *,
+        queries: list[str],
+        location: str = "United States",
+        rate_limit_seconds: float = 15.0,
+        max_pages: int = 2,
+    ):
         self._queries = queries
         self._location = location
         self._rate = rate_limit_seconds
@@ -724,9 +743,7 @@ class LinkedInSource(Source):
                     logger.info("linkedin: fetching %s", url)
                     try:
                         await page.goto(url, wait_until="domcontentloaded")
-                        await page.wait_for_selector(
-                            "ul.jobs-search__results-list", timeout=15_000
-                        )
+                        await page.wait_for_selector("ul.jobs-search__results-list", timeout=15_000)
                     except Exception as e:  # noqa: BLE001
                         logger.warning("linkedin: load failed: %s", e)
                         break
@@ -823,6 +840,7 @@ Glassdoor's structure changes more often than the others; this is the most fragi
 
 ```python
 """Glassdoor public job search."""
+
 from __future__ import annotations
 
 import asyncio
@@ -905,15 +923,19 @@ def parse_search_html(html: str) -> list[RawJob]:
     if any(m.lower() in html.lower() for m in _BAN_MARKERS):
         raise GlassdoorBanDetectedError("ban marker found")
     soup = BeautifulSoup(html, "html.parser")
-    return [rj for card in soup.select('li[data-test="jobListing"]')
-            if (rj := _parse_card(card)) is not None]
+    return [
+        rj
+        for card in soup.select('li[data-test="jobListing"]')
+        if (rj := _parse_card(card)) is not None
+    ]
 
 
 class GlassdoorSource(Source):
     name: ClassVar[str] = "glassdoor"
 
-    def __init__(self, *, queries: list[str], location: str = "Remote",
-                 rate_limit_seconds: float = 10.0):
+    def __init__(
+        self, *, queries: list[str], location: str = "Remote", rate_limit_seconds: float = 10.0
+    ):
         self._queries = queries
         self._location = location
         self._rate = rate_limit_seconds
@@ -931,9 +953,7 @@ class GlassdoorSource(Source):
                 logger.info("glassdoor: fetching %s", url)
                 try:
                     await page.goto(url, wait_until="domcontentloaded")
-                    await page.wait_for_selector(
-                        'li[data-test="jobListing"]', timeout=15_000
-                    )
+                    await page.wait_for_selector('li[data-test="jobListing"]', timeout=15_000)
                 except Exception as e:  # noqa: BLE001
                     logger.warning("glassdoor: load failed: %s", e)
                     continue
@@ -1095,8 +1115,10 @@ def fetch_all(db_path: Path, prefs: Prefs) -> str:
             store_db.mark_source_fetched(db_path, src.name, datetime.now(UTC))
         except (IndeedBanDetectedError, LinkedInBanDetectedError, GlassdoorBanDetectedError):
             from datetime import timedelta
+
             store_db.mark_source_cooldown(
-                db_path, src.name,
+                db_path,
+                src.name,
                 until=datetime.now(UTC) + timedelta(hours=24),
             )
             errors.append(f"{src.name}: banned, cooled 24h")
@@ -1117,7 +1139,9 @@ def test_fetch_skips_source_in_cooldown(env, monkeypatch):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml").read_text().replace(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
             "indeed_queries: []",
             "indeed_queries:\n  - python backend",
         )
@@ -1126,16 +1150,20 @@ def test_fetch_skips_source_in_cooldown(env, monkeypatch):
     from datetime import UTC, datetime, timedelta
 
     from shortlist.store.db import mark_source_cooldown
+
     mark_source_cooldown(
-        data / "db.sqlite", "indeed",
+        data / "db.sqlite",
+        "indeed",
         until=datetime.now(UTC) + timedelta(hours=24),
     )
 
     result = runner.invoke(app, ["fetch"])
     assert result.exit_code == 0, result.output
-    assert ("cooldown" in result.output.lower()
-            or "cooled" in result.output.lower()
-            or "skipping" in result.output.lower())
+    assert (
+        "cooldown" in result.output.lower()
+        or "cooled" in result.output.lower()
+        or "skipping" in result.output.lower()
+    )
 ```
 
 - [ ] **Step 6: Run + commit**
@@ -1188,8 +1216,9 @@ pytestmark = [
 
 def test_indeed_live_returns_some_results_or_bans():
     """Either a few jobs or a ban — both acceptable outcomes."""
-    src = IndeedSource(queries=["senior backend engineer"], location="Remote",
-                       rate_limit_seconds=2.0)
+    src = IndeedSource(
+        queries=["senior backend engineer"], location="Remote", rate_limit_seconds=2.0
+    )
     try:
         jobs = list(src.fetch(since=None))
     except IndeedBanDetectedError:
@@ -1307,8 +1336,7 @@ def sources_status() -> None:
     table.add_column("Last error")
     with store_db.connect(paths.db_path()) as conn:
         rows = conn.execute(
-            "SELECT name, last_fetched_at, cooldown_until, last_error FROM sources "
-            "ORDER BY name"
+            "SELECT name, last_fetched_at, cooldown_until, last_error FROM sources ORDER BY name"
         ).fetchall()
     for r in rows:
         table.add_row(r[0], r[1] or "—", r[2] or "—", r[3] or "—")
@@ -1324,8 +1352,10 @@ def test_sources_clear_cooldown_cli(env):
     from datetime import UTC, datetime, timedelta
 
     from shortlist.store.db import is_source_in_cooldown, mark_source_cooldown
-    mark_source_cooldown(data / "db.sqlite", "indeed",
-                          until=datetime.now(UTC) + timedelta(hours=24))
+
+    mark_source_cooldown(
+        data / "db.sqlite", "indeed", until=datetime.now(UTC) + timedelta(hours=24)
+    )
     assert is_source_in_cooldown(data / "db.sqlite", "indeed") is True
 
     result = runner.invoke(app, ["sources", "clear-cooldown", "indeed"])

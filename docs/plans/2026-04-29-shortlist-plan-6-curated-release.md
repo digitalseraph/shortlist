@@ -218,6 +218,7 @@ Algolia HN endpoints (public, no auth):
   - https://hn.algolia.com/api/v1/search?query=...&tags=ask_hn
   - https://hn.algolia.com/api/v1/items/<id>
 """
+
 from __future__ import annotations
 
 import html
@@ -432,6 +433,7 @@ RemoteOK exposes a JSON API at `https://remoteok.com/api`. First element of the 
 
 ```python
 """RemoteOK public JSON API source."""
+
 from __future__ import annotations
 
 import logging
@@ -582,6 +584,7 @@ Wellfound (formerly AngelList Talent) public listings: `https://wellfound.com/jo
 
 ```python
 """Wellfound (formerly AngelList Talent) public job listings."""
+
 from __future__ import annotations
 
 import asyncio
@@ -630,12 +633,12 @@ def _parse_card(card: Tag) -> RawJob | None:
 
     location = location_el.get_text(strip=True) if location_el else ""
     posted_iso = (
-        date_el["data-posted-at"]
-        if date_el is not None and date_el.get("data-posted-at") else None
+        date_el["data-posted-at"] if date_el is not None and date_el.get("data-posted-at") else None
     )
     posted_at = (
         datetime.fromisoformat(str(posted_iso).replace("Z", "+00:00"))
-        if posted_iso else datetime.now(UTC)
+        if posted_iso
+        else datetime.now(UTC)
     )
 
     return RawJob(
@@ -655,8 +658,11 @@ def parse_search_html(html: str) -> list[RawJob]:
     if any(m.lower() in html.lower() for m in _BAN_MARKERS):
         raise WellfoundBanDetectedError("ban marker in page")
     soup = BeautifulSoup(html, "html.parser")
-    return [rj for card in soup.select('div[data-test="JobSearchCard"]')
-            if (rj := _parse_card(card)) is not None]
+    return [
+        rj
+        for card in soup.select('div[data-test="JobSearchCard"]')
+        if (rj := _parse_card(card)) is not None
+    ]
 
 
 class WellfoundSource(Source):
@@ -678,9 +684,7 @@ class WellfoundSource(Source):
                 logger.info("wellfound: fetching %s", url)
                 try:
                     await page.goto(url, wait_until="domcontentloaded")
-                    await page.wait_for_selector(
-                        'div[data-test="JobSearchCard"]', timeout=15_000
-                    )
+                    await page.wait_for_selector('div[data-test="JobSearchCard"]', timeout=15_000)
                 except Exception as e:  # noqa: BLE001
                     logger.warning("wellfound: load failed: %s", e)
                     continue
@@ -779,6 +783,7 @@ Otta (now Welcome to the Jungle) public listings: `https://otta.com/jobs?keyword
 
 ```python
 """Otta (Welcome to the Jungle) public job listings."""
+
 from __future__ import annotations
 
 import asyncio
@@ -813,12 +818,15 @@ def _parse_age(s: str, *, now: datetime | None = None) -> datetime:
         return now
     n = int(m.group(1))
     unit = m.group(2)
-    return now - {
-        "hour": timedelta(hours=n),
-        "day": timedelta(days=n),
-        "week": timedelta(weeks=n),
-        "month": timedelta(days=n * 30),
-    }[unit]
+    return (
+        now
+        - {
+            "hour": timedelta(hours=n),
+            "day": timedelta(days=n),
+            "week": timedelta(weeks=n),
+            "month": timedelta(days=n * 30),
+        }[unit]
+    )
 
 
 def _parse_card(card: Tag) -> RawJob | None:
@@ -857,8 +865,11 @@ def parse_search_html(html: str) -> list[RawJob]:
     if any(m.lower() in html.lower() for m in _BAN_MARKERS):
         raise OttaBanDetectedError("ban marker in page")
     soup = BeautifulSoup(html, "html.parser")
-    return [rj for card in soup.select('li[data-testid="job-card"]')
-            if (rj := _parse_card(card)) is not None]
+    return [
+        rj
+        for card in soup.select('li[data-testid="job-card"]')
+        if (rj := _parse_card(card)) is not None
+    ]
 
 
 class OttaSource(Source):
@@ -880,9 +891,7 @@ class OttaSource(Source):
                 logger.info("otta: fetching %s", url)
                 try:
                     await page.goto(url, wait_until="domcontentloaded")
-                    await page.wait_for_selector(
-                        'li[data-testid="job-card"]', timeout=15_000
-                    )
+                    await page.wait_for_selector('li[data-testid="job-card"]', timeout=15_000)
                 except Exception as e:  # noqa: BLE001
                     logger.warning("otta: load failed: %s", e)
                     continue
@@ -975,6 +984,7 @@ Generic feed reader. Each entry becomes a `RawJob`. The user supplies a list of 
 
 ```python
 """Generic RSS feed source."""
+
 from __future__ import annotations
 
 import logging
@@ -1027,9 +1037,9 @@ def parse_feed(content: str | bytes, *, feed_url: str) -> list[RawJob]:
     parsed = feedparser.parse(content)
     channel_title = str(parsed.feed.get("title") or "")
     return [
-        rj for e in parsed.entries
-        if (rj := _entry_to_rawjob(e, channel_title=channel_title, feed_url=feed_url))
-        is not None
+        rj
+        for e in parsed.entries
+        if (rj := _entry_to_rawjob(e, channel_title=channel_title, feed_url=feed_url)) is not None
     ]
 
 
@@ -1198,20 +1208,25 @@ def test_fetch_with_curated_sources_runs_no_errors(env, monkeypatch):
     """Smoke: enabling HN + RemoteOK + RSS doesn't crash fetch (mocked)."""
     cfg, data = env
     runner.invoke(app, ["config", "init"])
-    prefs_yaml = (cfg / "prefs.yaml").read_text() \
-        .replace("hn_enabled: false", "hn_enabled: true") \
-        .replace("remoteok_enabled: false", "remoteok_enabled: true") \
+    prefs_yaml = (
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace("hn_enabled: false", "hn_enabled: true")
+        .replace("remoteok_enabled: false", "remoteok_enabled: true")
         .replace("rss_urls: []", "rss_urls:\n  - https://example.invalid/feed.rss")
+    )
     (cfg / "prefs.yaml").write_text(prefs_yaml)
     runner.invoke(app, ["db", "init"])
 
     class _Stub:
         def __init__(self, name):
             self.name = name
+
         def fetch(self, since=None):
             return iter([])
 
     import shortlist.cli as cli_mod
+
     monkeypatch.setattr(cli_mod, "HNWhoHiringSource", lambda: _Stub("hn_who_hiring"))
     monkeypatch.setattr(cli_mod, "RemoteOKSource", lambda: _Stub("remoteok"))
     monkeypatch.setattr(cli_mod, "RSSSource", lambda urls: _Stub("rss"))

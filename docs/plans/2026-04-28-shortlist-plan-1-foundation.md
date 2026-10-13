@@ -312,9 +312,15 @@ def test_job_status_default_is_new():
 def test_job_score_bounds():
     with pytest.raises(ValidationError):
         Job(
-            id=1, source="x", external_id="x", company="x", title="x",
-            url="https://x", posted_at=datetime.now(timezone.utc),
-            discovered_at=datetime.now(timezone.utc), score=101,
+            id=1,
+            source="x",
+            external_id="x",
+            company="x",
+            title="x",
+            url="https://x",
+            posted_at=datetime.now(timezone.utc),
+            discovered_at=datetime.now(timezone.utc),
+            score=101,
         )
 ```
 
@@ -334,6 +340,7 @@ Expected: ImportError / ModuleNotFoundError on `shortlist.models`.
 RawJob: shape returned by source clients before persistence.
 Job:    shape after the row is in SQLite (has id, status, scoring fields).
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -342,8 +349,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 JobStatus = Literal[
-    "new", "tailored", "applied", "screen", "interview",
-    "offer", "rejected", "withdrawn",
+    "new",
+    "tailored",
+    "applied",
+    "screen",
+    "interview",
+    "offer",
+    "rejected",
+    "withdrawn",
 ]
 
 
@@ -505,24 +518,35 @@ def test_load_prefs_defaults():
 
 def test_config_rejects_negative_budget():
     with pytest.raises(ValidationError):
-        Config.model_validate({
-            "anthropic": {"key_source": "env", "key_env_var": "X"},
-            "budget": {"daily_usd": -1.0, "monthly_usd": 60.0},
-            "paths": {"resume": "~/r.md", "output_dir": "~/jobs"},
-            "sources": {},
-            "ranker": {"top_k_for_llm_rerank": 30, "embedding_model": "bge",
-                       "rerank_model": "x"},
-            "tailor": {"model": "x", "cover_paragraphs": 3},
-        })
+        Config.model_validate(
+            {
+                "anthropic": {"key_source": "env", "key_env_var": "X"},
+                "budget": {"daily_usd": -1.0, "monthly_usd": 60.0},
+                "paths": {"resume": "~/r.md", "output_dir": "~/jobs"},
+                "sources": {},
+                "ranker": {
+                    "top_k_for_llm_rerank": 30,
+                    "embedding_model": "bge",
+                    "rerank_model": "x",
+                },
+                "tailor": {"model": "x", "cover_paragraphs": 3},
+            }
+        )
 
 
 def test_prefs_rejects_empty_titles():
     with pytest.raises(ValidationError):
-        Prefs.model_validate({
-            "titles": [], "locations": ["Remote"], "remote_ok": True,
-            "comp_floor_usd": 100000, "exclude_keywords": [],
-            "seniority": [], "greenhouse_companies": [],
-        })
+        Prefs.model_validate(
+            {
+                "titles": [],
+                "locations": ["Remote"],
+                "remote_ok": True,
+                "comp_floor_usd": 100000,
+                "exclude_keywords": [],
+                "seniority": [],
+                "greenhouse_companies": [],
+            }
+        )
 ```
 
 - [ ] **Step 3: Run tests to verify they fail**
@@ -537,6 +561,7 @@ Expected: ImportError on `shortlist.config`.
 
 ```python
 """Configuration loading + validation for Shortlist."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -605,8 +630,7 @@ class Prefs(BaseModel):
     seniority: list[str]
     greenhouse_companies: list[str] = Field(default_factory=list)
 
-    @field_validator("titles", "locations", "exclude_keywords", "seniority",
-                     "greenhouse_companies")
+    @field_validator("titles", "locations", "exclude_keywords", "seniority", "greenhouse_companies")
     @classmethod
     def _strip(cls, v: list[str]) -> list[str]:
         return [s.strip() for s in v if s.strip()]
@@ -746,20 +770,35 @@ def test_migrate_creates_jobs_table(db_path: Path):
 
 def test_jobs_unique_constraint(db_path: Path):
     import sqlite3
+
     migrate(db_path)
     with connect(db_path) as conn:
         conn.execute(
             "INSERT INTO jobs (source, external_id, company, title, url, "
             "posted_at, discovered_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("greenhouse", "gh_1", "Acme", "Eng", "https://x", "2026-04-25T09:00:00Z",
-             "2026-04-28T12:00:00Z"),
+            (
+                "greenhouse",
+                "gh_1",
+                "Acme",
+                "Eng",
+                "https://x",
+                "2026-04-25T09:00:00Z",
+                "2026-04-28T12:00:00Z",
+            ),
         )
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
                 "INSERT INTO jobs (source, external_id, company, title, url, "
                 "posted_at, discovered_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                ("greenhouse", "gh_1", "Acme", "Eng", "https://x",
-                 "2026-04-25T09:00:00Z", "2026-04-28T12:00:00Z"),
+                (
+                    "greenhouse",
+                    "gh_1",
+                    "Acme",
+                    "Eng",
+                    "https://x",
+                    "2026-04-25T09:00:00Z",
+                    "2026-04-28T12:00:00Z",
+                ),
             )
 ```
 
@@ -780,6 +819,7 @@ Migrations live in `_migrations/NNN_*.sql`, applied in lexical order.
 A `_schema_version` table records the highest applied migration number.
 Every `migrate()` is idempotent.
 """
+
 from __future__ import annotations
 
 import re
@@ -810,17 +850,14 @@ def connect(path: Path) -> Iterator[sqlite3.Connection]:
 
 def _ensure_version_table(conn: sqlite3.Connection) -> None:
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS _schema_version "
-        "(version INTEGER NOT NULL PRIMARY KEY)"
+        "CREATE TABLE IF NOT EXISTS _schema_version (version INTEGER NOT NULL PRIMARY KEY)"
     )
 
 
 def current_version(path: Path) -> int:
     with connect(path) as conn:
         _ensure_version_table(conn)
-        row = conn.execute(
-            "SELECT COALESCE(MAX(version), 0) FROM _schema_version"
-        ).fetchone()
+        row = conn.execute("SELECT COALESCE(MAX(version), 0) FROM _schema_version").fetchone()
     return int(row[0])
 
 
@@ -974,9 +1011,7 @@ def _row_to_job(row: sqlite3.Row) -> Job:
         title=row["title"],
         url=row["url"],
         posted_at=datetime.fromisoformat(row["posted_at"].replace("Z", "+00:00")),
-        discovered_at=datetime.fromisoformat(
-            row["discovered_at"].replace("Z", "+00:00")
-        ),
+        discovered_at=datetime.fromisoformat(row["discovered_at"].replace("Z", "+00:00")),
         location=row["location"],
         remote=bool(row["remote"]),
         comp_min=row["comp_min"],
@@ -987,11 +1022,13 @@ def _row_to_job(row: sqlite3.Row) -> Job:
         status=row["status"],
         status_changed_at=(
             datetime.fromisoformat(row["status_changed_at"].replace("Z", "+00:00"))
-            if row["status_changed_at"] else None
+            if row["status_changed_at"]
+            else None
         ),
         scored_with_prefs_at=(
             datetime.fromisoformat(row["scored_with_prefs_at"].replace("Z", "+00:00"))
-            if row["scored_with_prefs_at"] else None
+            if row["scored_with_prefs_at"]
+            else None
         ),
         scored_with_model=row["scored_with_model"],
     )
@@ -1020,9 +1057,17 @@ def upsert_job(path: Path, raw: RawJob, *, now: datetime | None = None) -> Job:
                 description_md = excluded.description_md
             """,
             (
-                raw.source, raw.external_id, raw.company, raw.title, str(raw.url),
-                _utc_iso(raw.posted_at), _utc_iso(discovered),
-                raw.location, int(raw.remote), raw.comp_min, raw.comp_max,
+                raw.source,
+                raw.external_id,
+                raw.company,
+                raw.title,
+                str(raw.url),
+                _utc_iso(raw.posted_at),
+                _utc_iso(discovered),
+                raw.location,
+                int(raw.remote),
+                raw.comp_min,
+                raw.comp_max,
                 raw.description_md,
             ),
         )
@@ -1075,9 +1120,7 @@ def mark_source_fetched(path: Path, name: str, when: datetime) -> None:
 
 def source_last_fetched(path: Path, name: str) -> datetime | None:
     with connect(path) as conn:
-        row = conn.execute(
-            "SELECT last_fetched_at FROM sources WHERE name = ?", (name,)
-        ).fetchone()
+        row = conn.execute("SELECT last_fetched_at FROM sources WHERE name = ?", (name,)).fetchone()
     if row is None or row[0] is None:
         return None
     return datetime.fromisoformat(row[0].replace("Z", "+00:00"))
@@ -1127,10 +1170,14 @@ def test_source_abc_requires_fetch():
 def test_concrete_source_fetch_yields_rawjob():
     class Fake(Source):
         name = "fake"
+
         def fetch(self, since):
             yield RawJob(
-                source="fake", external_id="x_1", company="Acme",
-                title="Eng", url="https://example.com",
+                source="fake",
+                external_id="x_1",
+                company="Acme",
+                title="Eng",
+                url="https://example.com",
                 posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=timezone.utc),
             )
 
@@ -1151,6 +1198,7 @@ Expected: ImportError on `shortlist.sources.base`.
 
 ```python
 """Source base class — every fetcher implements this contract."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -1290,11 +1338,13 @@ def test_greenhouse_fetch_retries_on_500():
     route = respx.get(
         "https://boards-api.greenhouse.io/v1/boards/acme/jobs",
         params={"content": "true"},
-    ).mock(side_effect=[
-        httpx.Response(500),
-        httpx.Response(500),
-        httpx.Response(200, json=payload),
-    ])
+    ).mock(
+        side_effect=[
+            httpx.Response(500),
+            httpx.Response(500),
+            httpx.Response(200, json=payload),
+        ]
+    )
 
     client = GreenhouseClient()
     raw_payloads = list(client.fetch_company("acme"))
@@ -1335,6 +1385,7 @@ Public, unauthenticated. Endpoint:
 `content=true` returns the URL-encoded HTML description with the job, avoiding
 a per-job follow-up call.
 """
+
 from __future__ import annotations
 
 import logging
@@ -1604,13 +1655,18 @@ def _prefs(**overrides) -> Prefs:
 
 def _job(**overrides) -> Job:
     base = dict(
-        id=1, source="greenhouse", external_id="acme:1", company="Acme",
+        id=1,
+        source="greenhouse",
+        external_id="acme:1",
+        company="Acme",
         title="Senior Backend Engineer",
         url="https://example.com/jobs/1",
         posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=timezone.utc),
         discovered_at=datetime(2026, 4, 28, 12, 0, tzinfo=timezone.utc),
-        location="Remote - US", remote=True,
-        comp_min=200000, comp_max=240000,
+        location="Remote - US",
+        remote=True,
+        comp_min=200000,
+        comp_max=240000,
         description_md="Python, Postgres, distributed systems.",
     )
     base.update(overrides)
@@ -1682,6 +1738,7 @@ A job `passes` only if all of the following hold:
   - Compensation: if `job.comp_max` is known, it must be >= `prefs.comp_floor_usd`.
     Unknown compensation passes (ATS often omits it).
 """
+
 from __future__ import annotations
 
 from shortlist.config import Prefs
@@ -1793,6 +1850,7 @@ Honors env overrides (used by tests):
   SHORTLIST_CONFIG_HOME → config_dir()
   SHORTLIST_DATA_HOME   → data_dir()
 """
+
 from __future__ import annotations
 
 import os
@@ -1937,6 +1995,7 @@ Subcommand groups:
   rank    — apply hard filter (Plan 1) / LLM rerank (Plan 2)
   list    — print stored jobs
 """
+
 from __future__ import annotations
 
 import shutil
@@ -2177,9 +2236,13 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 def test_fetch_persists_jobs(env):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
-    prefs_yaml = (cfg / "prefs.yaml").read_text().replace(
-        "greenhouse_companies: []",
-        "greenhouse_companies:\n  - acme",
+    prefs_yaml = (
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
+            "greenhouse_companies: []",
+            "greenhouse_companies:\n  - acme",
+        )
     )
     (cfg / "prefs.yaml").write_text(prefs_yaml)
     runner.invoke(app, ["db", "init"])
@@ -2204,7 +2267,9 @@ def test_fetch_handles_source_error_gracefully(env):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml").read_text().replace(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - nopecorp",
         )
@@ -2302,8 +2367,8 @@ def test_update_score(db_path):
     migrate(db_path)
     job = upsert_job(db_path, _raw())
     from shortlist.store.db import update_score
-    update_score(db_path, job.id, score=42, reason="hard filter pass",
-                 model="hard_filter")
+
+    update_score(db_path, job.id, score=42, reason="hard filter pass", model="hard_filter")
     out = list_jobs(db_path)[0]
     assert out.score == 42
     assert out.score_reason == "hard filter pass"
@@ -2322,7 +2387,12 @@ Expected: ImportError on `update_score`.
 
 ```python
 def update_score(
-    path: Path, job_id: int, *, score: int, reason: str, model: str,
+    path: Path,
+    job_id: int,
+    *,
+    score: int,
+    reason: str,
+    model: str,
     when: datetime | None = None,
 ) -> None:
     when = when or datetime.now(timezone.utc)
@@ -2355,7 +2425,9 @@ def test_rank_scores_passing_jobs_high_failing_low(env):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml").read_text().replace(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - acme",
         )
@@ -2376,6 +2448,7 @@ def test_rank_scores_passing_jobs_high_failing_low(env):
     # "Staff Platform Engineer" (passes via "staff" seniority).
     # Both pass hard filter -> score 50 (placeholder for Plan 1).
     from shortlist.store.db import list_jobs
+
     jobs = list_jobs(data / "db.sqlite")
     scores = sorted(j.score for j in jobs if j.score is not None)
     assert scores == [50, 50]
@@ -2417,12 +2490,12 @@ def rank() -> None:
 
     for job in store_db.list_jobs(db):
         if passes(job, prefs):
-            store_db.update_score(db, job.id, score=50,
-                                  reason="passed hard filter", model="hard_filter")
+            store_db.update_score(
+                db, job.id, score=50, reason="passed hard filter", model="hard_filter"
+            )
             pass_count += 1
         else:
-            store_db.update_score(db, job.id, score=0,
-                                  reason="filtered out", model="hard_filter")
+            store_db.update_score(db, job.id, score=0, reason="filtered out", model="hard_filter")
             fail_count += 1
 
     console.print(f"ranked: {pass_count} pass / {fail_count} filtered")
@@ -2461,7 +2534,9 @@ def test_list_shows_top_jobs(env):
     cfg, data = env
     runner.invoke(app, ["config", "init"])
     (cfg / "prefs.yaml").write_text(
-        (cfg / "prefs.yaml").read_text().replace(
+        (cfg / "prefs.yaml")
+        .read_text()
+        .replace(
             "greenhouse_companies: []",
             "greenhouse_companies:\n  - acme",
         )

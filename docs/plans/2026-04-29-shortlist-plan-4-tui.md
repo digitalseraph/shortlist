@@ -96,6 +96,7 @@ pip install -e ".[dev]"
 
 ```python
 """Shortlist Textual TUI."""
+
 from __future__ import annotations
 
 from shortlist_tui.app import run_tui
@@ -107,6 +108,7 @@ __all__ = ["run_tui"]
 
 ```python
 """Allow `python -m shortlist_tui`."""
+
 from shortlist_tui.app import run_tui
 
 if __name__ == "__main__":
@@ -117,6 +119,7 @@ if __name__ == "__main__":
 
 ```python
 """Shortlist TUI main app — minimal scaffold; later tasks add screens."""
+
 from __future__ import annotations
 
 from textual.app import App, ComposeResult
@@ -149,6 +152,7 @@ Append:
 def tui_cmd() -> None:
     """Launch the Textual TUI."""
     from shortlist_tui import run_tui
+
     run_tui()
 ```
 
@@ -204,12 +208,19 @@ def db_path(tmp_path: Path) -> Path:
 
 
 def _seed(db: Path, eid: str = "gh_1", title: str = "Senior Backend Engineer") -> int:
-    job = upsert_job(db, RawJob(
-        source="greenhouse", external_id=eid, company="Acme",
-        title=title, url=f"https://example.com/{eid}",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote - US", remote=True,
-    ))
+    job = upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id=eid,
+            company="Acme",
+            title=title,
+            url=f"https://example.com/{eid}",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote - US",
+            remote=True,
+        ),
+    )
     return job.id
 
 
@@ -261,6 +272,7 @@ def test_jobrow_score_display_handles_none(db_path):
 The TUI only consumes these. Writes go through shortlist_tui.workers
 (which call the underlying lib) — never directly via SQL from screens.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -338,6 +350,7 @@ Expected: 4 new pass + 120 prior + 1 skip = 124 pass + 1 skip.
 
 ```python
 """JobList screen — sortable table of all jobs."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -369,8 +382,7 @@ class JobListScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static("Jobs (j/k navigate, enter=open, r=refresh, q=quit)",
-                     id="hint")
+        yield Static("Jobs (j/k navigate, enter=open, r=refresh, q=quit)", id="hint")
         yield DataTable(id="jobs", cursor_type="row")
         yield Footer()
 
@@ -385,7 +397,11 @@ class JobListScreen(Screen[None]):
         table.clear()
         for r in self._rows:
             table.add_row(
-                r.score_display, r.company, r.title, r.location, r.status_display,
+                r.score_display,
+                r.company,
+                r.title,
+                r.location,
+                r.status_display,
                 key=str(r.id),
             )
 
@@ -417,6 +433,7 @@ class JobListScreen(Screen[None]):
 
 ```python
 """Shortlist TUI main app."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -462,13 +479,19 @@ from shortlist_tui.app import ShortlistApp
 async def test_joblist_renders_seeded_jobs(tmp_path: Path):
     db = tmp_path / "db.sqlite"
     migrate(db)
-    job = upsert_job(db, RawJob(
-        source="greenhouse", external_id="acme:1", company="Acme",
-        title="Senior Backend Engineer",
-        url="https://example.com/1",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote - US", remote=True,
-    ))
+    job = upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote - US",
+            remote=True,
+        ),
+    )
     update_score(db, job.id, score=87, reason="x", model="m")
 
     async with ShortlistApp(db_path=db).run_test() as pilot:
@@ -517,6 +540,7 @@ Expected: 2 new pass + 124 prior + 1 skip = 126 pass + 1 skip.
 
 ```python
 """JobDetail screen — show JD + tailored docs preview."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -572,9 +596,7 @@ class JobDetailScreen(Screen[None]):
             self.query_one("#title", Static).update("[red]job not found[/red]")
             return
         job = jobs[0]
-        self.query_one("#title", Static).update(
-            f"[bold]{job.company}[/bold] — {job.title}"
-        )
+        self.query_one("#title", Static).update(f"[bold]{job.company}[/bold] — {job.title}")
         self.query_one("#meta", Static).update(
             f"[dim]{job.location or ''} · {job.status} · score={job.score or '—'}[/dim]\n"
             f"[blue]{job.url}[/blue]"
@@ -589,8 +611,11 @@ class JobDetailScreen(Screen[None]):
             self.query_one("#cover_md", Markdown).update("")
             self.query_one("#notes_md", Markdown).update("")
             return
-        for stem, widget_id in (("resume", "#resume_md"), ("cover", "#cover_md"),
-                                 ("notes", "#notes_md")):
+        for stem, widget_id in (
+            ("resume", "#resume_md"),
+            ("cover", "#cover_md"),
+            ("notes", "#notes_md"),
+        ):
             md = out_dir / f"{stem}.md"
             self.query_one(widget_id, Markdown).update(
                 md.read_text() if md.exists() else f"_{stem}.md missing_"
@@ -601,6 +626,7 @@ class JobDetailScreen(Screen[None]):
         if not jobs:
             return
         import webbrowser
+
         webbrowser.open(str(jobs[0].url))
 ```
 
@@ -615,6 +641,7 @@ def action_select_job(self) -> None:
         return
     row = self._rows[table.cursor_row]
     from shortlist_tui.screens.job_detail import JobDetailScreen
+
     self.app.push_screen(JobDetailScreen(self._db, row.id))
 ```
 
@@ -625,14 +652,20 @@ def action_select_job(self) -> None:
 async def test_enter_opens_job_detail(tmp_path: Path):
     db = tmp_path / "db.sqlite"
     migrate(db)
-    job = upsert_job(db, RawJob(
-        source="greenhouse", external_id="acme:1", company="Acme",
-        title="Senior Backend Engineer",
-        url="https://example.com/1",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote - US", remote=True,
-        description_md="Distributed Python systems.",
-    ))
+    job = upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote - US",
+            remote=True,
+            description_md="Distributed Python systems.",
+        ),
+    )
     update_score(db, job.id, score=80, reason="x", model="m")
 
     async with ShortlistApp(db_path=db).run_test() as pilot:
@@ -670,6 +703,7 @@ Expected: 1 new pass + 126 prior + 1 skip = 127 pass + 1 skip.
 
 ```python
 """ApplicationsBoard — kanban-style by status."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -684,7 +718,12 @@ from shortlist.models import JobStatus
 from shortlist_tui.data import list_job_rows
 
 _COLUMNS: tuple[JobStatus, ...] = (
-    "tailored", "applied", "screen", "interview", "offer", "rejected",
+    "tailored",
+    "applied",
+    "screen",
+    "interview",
+    "offer",
+    "rejected",
 )
 
 
@@ -702,10 +741,15 @@ class ApplicationsBoardScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Horizontal(
-            *[VerticalScroll(Static(id=f"col-{s}-header"),
-                              Static(id=f"col-{s}-body"),
-                              id=f"col-{s}", classes="kanban-col")
-              for s in _COLUMNS],
+            *[
+                VerticalScroll(
+                    Static(id=f"col-{s}-header"),
+                    Static(id=f"col-{s}-body"),
+                    id=f"col-{s}",
+                    classes="kanban-col",
+                )
+                for s in _COLUMNS
+            ],
             id="board",
         )
         yield Footer()
@@ -719,9 +763,7 @@ class ApplicationsBoardScreen(Screen[None]):
             self.query_one(f"#col-{status}-header", Static).update(
                 f"[bold]{status}[/bold] ({len(rows)})"
             )
-            body = "\n".join(
-                f"• {r.company} — {r.title[:30]}" for r in rows
-            ) or "[dim]none[/dim]"
+            body = "\n".join(f"• {r.company} — {r.title[:30]}" for r in rows) or "[dim]none[/dim]"
             self.query_one(f"#col-{status}-body", Static).update(body)
 
     def action_refresh(self) -> None:
@@ -758,6 +800,7 @@ class ShortlistApp(App[None]):
 
     def action_push_applications(self) -> None:
         from shortlist_tui.screens.applications import ApplicationsBoardScreen
+
         self.push_screen(ApplicationsBoardScreen(self._db_path))
 ```
 
@@ -779,13 +822,19 @@ from shortlist_tui.app import ShortlistApp
 async def test_applications_board_groups_by_status(tmp_path: Path):
     db = tmp_path / "db.sqlite"
     migrate(db)
-    job = upsert_job(db, RawJob(
-        source="greenhouse", external_id="acme:1", company="Acme",
-        title="Senior Backend Engineer",
-        url="https://example.com/1",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote - US", remote=True,
-    ))
+    job = upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote - US",
+            remote=True,
+        ),
+    )
     transition_status(db, job.id, "tailored")
 
     async with ShortlistApp(db_path=db).run_test() as pilot:
@@ -822,6 +871,7 @@ Expected: 1 new pass + 127 prior + 1 skip = 128 pass + 1 skip.
 
 ```python
 """Settings screen — read-only view of config + prefs."""
+
 from __future__ import annotations
 
 from textual.app import ComposeResult
@@ -859,8 +909,7 @@ class SettingsScreen(Screen[None]):
                 f"monthly ${cfg.budget.monthly_usd:.2f}\n"
                 f"  rerank model: {cfg.ranker.rerank_model}\n"
                 f"  tailor model: {cfg.tailor.model}\n"
-                f"  enabled sources: " +
-                ", ".join(k for k, v in cfg.sources.items() if v.enabled)
+                f"  enabled sources: " + ", ".join(k for k, v in cfg.sources.items() if v.enabled)
             )
         except FileNotFoundError:
             self.query_one("#config-summary", Static).update(
@@ -881,19 +930,16 @@ class SettingsScreen(Screen[None]):
                 f"smartrecruiters: {len(prefs.smartrecruiters_companies)}"
             )
         except FileNotFoundError:
-            self.query_one("#prefs-summary", Static).update(
-                "[red]prefs.yaml missing[/red]"
-            )
+            self.query_one("#prefs-summary", Static).update("[red]prefs.yaml missing[/red]")
 
         self.query_one("#paths-summary", Static).update(
-            f"[bold]Paths[/bold]\n"
-            f"  data: {paths.data_dir()}\n"
-            f"  db: {paths.db_path()}"
+            f"[bold]Paths[/bold]\n  data: {paths.data_dir()}\n  db: {paths.db_path()}"
         )
 
     def action_edit_externally(self) -> None:
         import os
         import subprocess
+
         editor = os.environ.get("EDITOR", "nano")
         subprocess.Popen([editor, str(paths.config_path())])
 ```
@@ -907,8 +953,10 @@ BINDINGS = [
     ("s", "push_settings", "Settings"),
 ]
 
+
 def action_push_settings(self) -> None:
     from shortlist_tui.screens.settings import SettingsScreen
+
     self.push_screen(SettingsScreen())
 ```
 
@@ -970,6 +1018,7 @@ Each function is a synchronous, side-effecting wrapper over shortlist.*
 suitable for Textual `@work(thread=True)`. They return summary strings
 that screens can display.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -993,25 +1042,19 @@ from shortlist.tailor.orchestrator import TailorOrchestrator
 def _build_sources(prefs: Prefs) -> list[Source]:
     sources: list[Source] = []
     if prefs.greenhouse_companies:
-        sources.append(GreenhouseSource(
-            companies={t: t.title() for t in prefs.greenhouse_companies}
-        ))
+        sources.append(
+            GreenhouseSource(companies={t: t.title() for t in prefs.greenhouse_companies})
+        )
     if prefs.lever_companies:
-        sources.append(LeverSource(
-            companies={t: t.title() for t in prefs.lever_companies}
-        ))
+        sources.append(LeverSource(companies={t: t.title() for t in prefs.lever_companies}))
     if prefs.ashby_companies:
-        sources.append(AshbySource(
-            companies={t: t.title() for t in prefs.ashby_companies}
-        ))
+        sources.append(AshbySource(companies={t: t.title() for t in prefs.ashby_companies}))
     if prefs.workable_companies:
-        sources.append(WorkableSource(
-            companies={t: t.title() for t in prefs.workable_companies}
-        ))
+        sources.append(WorkableSource(companies={t: t.title() for t in prefs.workable_companies}))
     if prefs.smartrecruiters_companies:
-        sources.append(SmartRecruitersSource(
-            companies={t: t for t in prefs.smartrecruiters_companies}
-        ))
+        sources.append(
+            SmartRecruitersSource(companies={t: t for t in prefs.smartrecruiters_companies})
+        )
     return sources
 
 
@@ -1033,17 +1076,27 @@ def fetch_all(db_path: Path, prefs: Prefs) -> str:
 
 
 def rank_all(
-    db_path: Path, *, cfg: Config, prefs: Prefs, resume_path: Path,
-    anthropic_client: Any | None, top_k: int = 30,
+    db_path: Path,
+    *,
+    cfg: Config,
+    prefs: Prefs,
+    resume_path: Path,
+    anthropic_client: Any | None,
+    top_k: int = 30,
 ) -> str:
     embedder = EmbeddingService(model_name=cfg.ranker.embedding_model)
     reranker = (
         LLMReranker(client=anthropic_client, model=cfg.ranker.rerank_model)
-        if anthropic_client is not None else None
+        if anthropic_client is not None
+        else None
     )
     summary = run_pipeline(
-        db_path, prefs=prefs, resume_path=resume_path,
-        embedder=embedder, reranker=reranker, top_k=top_k,
+        db_path,
+        prefs=prefs,
+        resume_path=resume_path,
+        embedder=embedder,
+        reranker=reranker,
+        top_k=top_k,
     )
     return (
         f"filtered={summary.filtered} | top_k={summary.cosine_top_k} | "
@@ -1052,8 +1105,13 @@ def rank_all(
 
 
 def tailor_one(
-    db_path: Path, job_id: int, *, cfg: Config, prefs: Prefs,
-    resume_path: Path, anthropic_client: Any,
+    db_path: Path,
+    job_id: int,
+    *,
+    cfg: Config,
+    prefs: Prefs,
+    resume_path: Path,
+    anthropic_client: Any,
 ) -> str:
     orch = TailorOrchestrator(
         db_path=db_path,
@@ -1082,8 +1140,12 @@ from shortlist_tui.workers import fetch_all, tailor_one
 
 def _prefs(**ov) -> Prefs:
     base = dict(
-        titles=["Senior Backend Engineer"], locations=["Remote"], remote_ok=True,
-        comp_floor_usd=180000, exclude_keywords=[], seniority=["senior"],
+        titles=["Senior Backend Engineer"],
+        locations=["Remote"],
+        remote_ok=True,
+        comp_floor_usd=180000,
+        exclude_keywords=[],
+        seniority=["senior"],
         greenhouse_companies=[],
     )
     base.update(ov)
@@ -1100,20 +1162,25 @@ def test_fetch_all_empty_prefs_returns_zero(tmp_path: Path):
 def test_tailor_one_writes_outputs(tmp_path: Path):
     db = tmp_path / "db.sqlite"
     migrate(db)
-    job = upsert_job(db, RawJob(
-        source="greenhouse", external_id="acme:1", company="Acme",
-        title="Senior Backend Engineer",
-        url="https://example.com/1",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote", remote=True,
-        description_md="Python work.",
-    ))
+    job = upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="acme:1",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/1",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+            description_md="Python work.",
+        ),
+    )
     resume = tmp_path / "resume.md"
     resume.write_text("R")
     out_root = tmp_path / "jobs"
 
-    fixture = (Path(__file__).parent.parent /
-               "fixtures/llm_responses/sonnet_tailor_sample.md")
+    fixture = Path(__file__).parent.parent / "fixtures/llm_responses/sonnet_tailor_sample.md"
     fake_anth = MagicMock()
     msg = MagicMock()
     msg.content = [MagicMock(text=fixture.read_text())]
@@ -1121,18 +1188,24 @@ def test_tailor_one_writes_outputs(tmp_path: Path):
     msg.usage.output_tokens = 1200
     fake_anth.messages.create.return_value = msg
 
-    cfg = Config.model_validate({
-        "anthropic": {"key_source": "env", "key_env_var": "ANTHROPIC_API_KEY"},
-        "budget": {"daily_usd": 5.0, "monthly_usd": 60.0},
-        "paths": {"resume": str(resume), "output_dir": str(out_root)},
-        "sources": {},
-        "ranker": {"top_k_for_llm_rerank": 30, "embedding_model": "bge-small-en-v1.5",
-                   "rerank_model": "claude-haiku-4-5-20251001"},
-        "tailor": {"model": "claude-sonnet-4-6", "cover_paragraphs": 3},
-    })
+    cfg = Config.model_validate(
+        {
+            "anthropic": {"key_source": "env", "key_env_var": "ANTHROPIC_API_KEY"},
+            "budget": {"daily_usd": 5.0, "monthly_usd": 60.0},
+            "paths": {"resume": str(resume), "output_dir": str(out_root)},
+            "sources": {},
+            "ranker": {
+                "top_k_for_llm_rerank": 30,
+                "embedding_model": "bge-small-en-v1.5",
+                "rerank_model": "claude-haiku-4-5-20251001",
+            },
+            "tailor": {"model": "claude-sonnet-4-6", "cover_paragraphs": 3},
+        }
+    )
 
-    summary = tailor_one(db, job.id, cfg=cfg, prefs=_prefs(),
-                        resume_path=resume, anthropic_client=fake_anth)
+    summary = tailor_one(
+        db, job.id, cfg=cfg, prefs=_prefs(), resume_path=resume, anthropic_client=fake_anth
+    )
     assert "tailored" in summary
     dirs = list(out_root.iterdir())
     assert len(dirs) == 1
@@ -1198,14 +1271,15 @@ class ShortlistApp(App[None]):
         resume = cfg.paths.resume.expanduser()
         key = os.environ.get(cfg.anthropic.key_env_var, "")
         if not key:
-            self.notify("ANTHROPIC_API_KEY not set — skipping LLM rerank",
-                        severity="warning")
+            self.notify("ANTHROPIC_API_KEY not set — skipping LLM rerank", severity="warning")
             client = None
         else:
             from anthropic import Anthropic
+
             client = Anthropic(api_key=key)
-        msg = rank_all(self._db_path, cfg=cfg, prefs=prefs,
-                       resume_path=resume, anthropic_client=client)
+        msg = rank_all(
+            self._db_path, cfg=cfg, prefs=prefs, resume_path=resume, anthropic_client=client
+        )
         self.notify(msg, severity="information")
         screen = self.screen_stack[-1]
         if hasattr(screen, "_reload"):
@@ -1221,8 +1295,15 @@ class ShortlistApp(App[None]):
             self.notify("ANTHROPIC_API_KEY not set", severity="error")
             return
         from anthropic import Anthropic
-        msg = tailor_one(self._db_path, job_id, cfg=cfg, prefs=prefs,
-                        resume_path=resume, anthropic_client=Anthropic(api_key=key))
+
+        msg = tailor_one(
+            self._db_path,
+            job_id,
+            cfg=cfg,
+            prefs=prefs,
+            resume_path=resume,
+            anthropic_client=Anthropic(api_key=key),
+        )
         self.notify(msg, severity="information")
         screen = self.screen_stack[-1]
         if hasattr(screen, "_reload"):
@@ -1279,10 +1360,13 @@ async def test_f_triggers_fetch(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("SHORTLIST_DATA_HOME", str(tmp_path / "data"))
 
     called: list[bool] = []
+
     def fake_fetch_all(*_a, **_k):
         called.append(True)
         return "fetched 0 jobs"
+
     import shortlist_tui.app as app_mod
+
     monkeypatch.setattr(app_mod, "fetch_all", fake_fetch_all)
     monkeypatch.setattr(app_mod, "load_prefs", lambda *_a, **_k: MagicMock())
 
@@ -1334,8 +1418,7 @@ class JobListScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static("Jobs (j/k navigate, enter=open, t=tailor, /=search, q=quit)",
-                     id="hint")
+        yield Static("Jobs (j/k navigate, enter=open, t=tailor, /=search, q=quit)", id="hint")
         yield Input(placeholder="filter by company or title…", id="search")
         yield DataTable(id="jobs", cursor_type="row")
         yield Footer()
@@ -1358,7 +1441,11 @@ class JobListScreen(Screen[None]):
             if q and q not in r.company.lower() and q not in r.title.lower():
                 continue
             table.add_row(
-                r.score_display, r.company, r.title, r.location, r.status_display,
+                r.score_display,
+                r.company,
+                r.title,
+                r.location,
+                r.status_display,
                 key=str(r.id),
             )
 ```
@@ -1370,20 +1457,32 @@ class JobListScreen(Screen[None]):
 async def test_search_filters_table(tmp_path: Path):
     db = tmp_path / "db.sqlite"
     migrate(db)
-    upsert_job(db, RawJob(
-        source="greenhouse", external_id="a", company="Acme",
-        title="Senior Backend Engineer",
-        url="https://example.com/a",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote", remote=True,
-    ))
-    upsert_job(db, RawJob(
-        source="greenhouse", external_id="b", company="Globex",
-        title="Frontend Engineer",
-        url="https://example.com/b",
-        posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
-        location="Remote", remote=True,
-    ))
+    upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="a",
+            company="Acme",
+            title="Senior Backend Engineer",
+            url="https://example.com/a",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+        ),
+    )
+    upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id="b",
+            company="Globex",
+            title="Frontend Engineer",
+            url="https://example.com/b",
+            posted_at=datetime(2026, 4, 25, 9, 0, tzinfo=UTC),
+            location="Remote",
+            remote=True,
+        ),
+    )
 
     async with ShortlistApp(db_path=db).run_test() as pilot:
         await pilot.pause()
