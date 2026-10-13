@@ -1,0 +1,17 @@
+{% extends "base_plain.html" %}
+{% block title %}People — Shortlist{% endblock %}
+{% block content %}
+<h1>People</h1>
+<ul class="profile-list">
+  {% for p in profiles %}
+  <li>
+    <a href="/p/{{ p.slug }}/">{{ p.display_name }}</a>
+    <form method="post" action="/profiles/{{ p.slug }}/delete" class="inline-form">
+      <input name="confirm" placeholder="type {{ p.display_name }} to confirm" required>
+      <button type="submit" class="danger">Delete</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+<p><a href="/profiles/new">Add a person…</a></p>
+{% endblock %}

@@ -22,11 +22,19 @@
 <body>
   <header>
     <nav>
-      <a href="/">Jobs</a>
-      <a href="/applications">Applications</a>
-      <a href="/costs">Costs</a>
-      <a href="/settings">Settings</a>
+      <a href="/p/{{ active.slug }}/">Jobs</a>
+      <a href="/p/{{ active.slug }}/applications">Applications</a>
+      <a href="/p/{{ active.slug }}/costs">Costs</a>
+      <a href="/p/{{ active.slug }}/settings">Settings</a>
     </nav>
+    <select class="profile-switcher" onchange="location.href=this.value">
+      {% for p in all_profiles %}
+      <option value="/p/{{ p.slug }}/" {% if p.slug == active.slug %}selected{% endif %}>
+        {{ p.display_name }}
+      </option>
+      {% endfor %}
+      <option value="/profiles">Manage people…</option>
+    </select>
     <div class="actions">
       <button hx-post="/fetch" hx-target="#toast" hx-swap="innerHTML">Fetch</button>
       <button hx-post="/rank?mode=no-llm" hx-target="#toast" hx-swap="innerHTML"
