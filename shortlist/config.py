@@ -8,6 +8,81 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+DEFAULT_CONFIG_YAML = """\
+# Shortlist configuration. See docs/spec.md for the full reference.
+anthropic:
+  key_source: env
+  key_env_var: ANTHROPIC_API_KEY
+budget:
+  daily_usd: 5.00
+  monthly_usd: 60.00
+paths:
+  resume: ~/jobs/resume.md
+  output_dir: ~/jobs
+  pdf_template: ~/.config/shortlist/pdf-template.tex
+sources:
+  greenhouse:
+    enabled: true
+    rate_limit_rpm: 30
+  indeed:
+    enabled: false
+    rate_limit_rpm: 6
+  linkedin:
+    enabled: false
+    rate_limit_rpm: 4
+  glassdoor:
+    enabled: false
+    rate_limit_rpm: 6
+  hn_who_hiring:
+    enabled: true
+  remoteok:
+    enabled: true
+  wellfound:
+    enabled: false
+    rate_limit_rpm: 6
+  otta:
+    enabled: false
+    rate_limit_rpm: 6
+  rss:
+    enabled: true
+ranker:
+  top_k_for_llm_rerank: 30
+  embedding_model: BAAI/bge-small-en-v1.5
+  rerank_model: claude-haiku-4-5-20251001
+tailor:
+  model: claude-sonnet-4-6
+  cover_paragraphs: 3
+"""
+
+DEFAULT_PREFS_YAML = """\
+# Shortlist preferences. Edit these to taste.
+titles:
+  - "Senior Backend Engineer"
+  - "Staff Engineer"
+locations:
+  - "Remote - US"
+  - "Atlanta, GA"
+remote_ok: true
+comp_floor_usd: 180000
+exclude_keywords: []
+seniority:
+  - senior
+  - staff
+greenhouse_companies: []
+lever_companies: []
+ashby_companies: []
+workable_companies: []
+smartrecruiters_companies: []
+indeed_queries: []
+linkedin_queries: []
+glassdoor_queries: []
+hn_enabled: false
+remoteok_enabled: false
+wellfound_queries: []
+otta_queries: []
+rss_urls: []
+"""
+
 
 class AnthropicConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
