@@ -223,7 +223,7 @@ def purge_untailored(path: Path) -> int:
             conn.execute("DELETE FROM job_embeddings")
             conn.execute("DELETE FROM jobs")
         after = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-    return before - after
+    return int(before) - int(after)
 
 
 def update_score(
