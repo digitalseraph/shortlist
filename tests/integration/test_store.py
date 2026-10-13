@@ -207,6 +207,30 @@ def test_cosine_top_k_returns_ordered_job_ids(db_path: Path):
     assert [j for (j, _d) in top] == [j2.id, j1.id]
 
 
+def test_cosine_top_k_falls_back_to_full_scan_above_knn_limit(db_path: Path):
+    """sqlite-vec MATCH caps k at 4096; verify full-scan path matches MATCH ranking."""
+    import numpy as np
+
+    from shortlist.store.db import _VEC_KNN_LIMIT, cosine_top_k, upsert_embedding
+
+    migrate(db_path)
+    rng = np.random.default_rng(42)
+    target = rng.standard_normal(384).astype("float32")
+    target /= np.linalg.norm(target)
+
+    for i in range(8):
+        job = upsert_job(db_path, _raw(f"gh_{i}", title=f"Job {i}"))
+        vec = target + rng.standard_normal(384).astype("float32") * (0.01 * (i + 1))
+        vec /= np.linalg.norm(vec)
+        upsert_embedding(db_path, job.id, vec)
+
+    knn = cosine_top_k(db_path, target, k=8)
+    huge = cosine_top_k(db_path, target, k=_VEC_KNN_LIMIT + 100)
+    assert [j for (j, _d) in huge] == [j for (j, _d) in knn]
+    for (_, dk), (_, dh) in zip(knn, huge, strict=True):
+        assert abs(dk - dh) < 1e-4
+
+
 def test_migrate_to_v3_creates_applications_and_contacts(db_path: Path):
     migrate(db_path)
     assert current_version(db_path) == 3

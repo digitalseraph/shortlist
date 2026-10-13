@@ -305,6 +305,11 @@ def get_embedding(path: Path, job_id: int) -> np.ndarray | None:
     return np.frombuffer(row[0], dtype=np.float32).copy()
 
 
+# sqlite-vec KNN MATCH caps k at this many rows; beyond it the query errors.
+# For larger k we full-scan and rank in numpy.
+_VEC_KNN_LIMIT = 4096
+
+
 def cosine_top_k(path: Path, query: np.ndarray, *, k: int = 30) -> list[tuple[int, float]]:
     """Return up to k (job_id, distance) ordered by ascending vec0 distance.
 
@@ -313,19 +318,33 @@ def cosine_top_k(path: Path, query: np.ndarray, *, k: int = 30) -> list[tuple[in
     """
     if query.dtype != np.float32:
         query = query.astype(np.float32)
+    k = int(k)
+    if k <= _VEC_KNN_LIMIT:
+        with connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT job_id, distance
+                FROM job_embeddings
+                WHERE embedding MATCH ?
+                ORDER BY distance
+                LIMIT ?
+                """,
+                (query.tobytes(), k),
+            ).fetchall()
+        return [(int(r["job_id"]), float(r["distance"])) for r in rows]
+
+    # On unit vectors, L2² = 2 − 2·dot, matching sqlite-vec's distance scale.
     with connect(path) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            """
-            SELECT job_id, distance
-            FROM job_embeddings
-            WHERE embedding MATCH ?
-            ORDER BY distance
-            LIMIT ?
-            """,
-            (query.tobytes(), int(k)),
-        ).fetchall()
-    return [(int(r["job_id"]), float(r["distance"])) for r in rows]
+        rows = conn.execute("SELECT job_id, embedding FROM job_embeddings").fetchall()
+    if not rows:
+        return []
+    ids = np.fromiter((r[0] for r in rows), dtype=np.int64, count=len(rows))
+    matrix = np.stack([np.frombuffer(r[1], dtype=np.float32) for r in rows])
+    dots = matrix @ query
+    distances = np.sqrt(np.maximum(0.0, 2.0 - 2.0 * dots))
+    order = np.argsort(distances, kind="stable")[:k]
+    return [(int(ids[i]), float(distances[i])) for i in order]
 
 
 # ---------------------------------------------------------------------------
