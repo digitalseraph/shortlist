@@ -48,8 +48,14 @@ def create_app() -> FastAPI:
             active = profiles.resolve()
         except profiles.ProfileError:
             return RedirectResponse("/profiles/new", status_code=307)
-        suffix = "" if path == "/" else path
-        return RedirectResponse(f"/p/{active.slug}{suffix}", status_code=307)
+        # "/" itself needs the trailing slash — job_list is registered at
+        # "/p/{slug}/", and a bare "/p/{slug}" would just trigger a second,
+        # Starlette-issued redirect to add it back.
+        suffix = "/" if path == "/" else path
+        target = f"/p/{active.slug}{suffix}"
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        return RedirectResponse(target, status_code=307)
 
     # profiles.router and resume.router land in later tasks; settings.router and
     # actions.router convert to the prefix in their own tasks too.

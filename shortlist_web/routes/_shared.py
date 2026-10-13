@@ -28,11 +28,15 @@ def toast(request: Request, message: str, severity: str, *, code: int = 200) -> 
 def profile_dep(slug: str) -> Profile:
     """Resolve the `{slug}` path parameter, 404ing rather than falling back.
 
-    A stale or mistyped link must never act on a different person's data.
+    A stale or mistyped link must never act on a different person's data. A
+    malformed slug (``load`` -> ``profile_dirs`` -> ``validate_slug``, which
+    raises ``InvalidSlugError`` before any not-found check runs) is just as
+    unknown as a well-formed absent one, so every ``ProfileError`` — not only
+    ``ProfileNotFoundError`` — 404s here instead of propagating as a 500.
     """
     try:
         return profiles.load(slug)
-    except profiles.ProfileNotFoundError as exc:
+    except profiles.ProfileError as exc:
         raise HTTPException(status_code=404, detail=f"no profile {slug!r}") from exc
 
 
