@@ -63,7 +63,7 @@ def test_db_backup_creates_file(env):
     runner.invoke(app, ["db", "init"])
     result = runner.invoke(app, ["db", "backup"])
     assert result.exit_code == 0
-    backups = list((data / "backups").glob("db-*.sqlite"))
+    backups = list((prof.db_path.parent / "backups").glob("db-*.sqlite"))
     assert len(backups) == 1
 
 
@@ -74,13 +74,35 @@ def test_db_backup_errors_when_no_db(env):
     assert result.exit_code == 1
 
 
+def test_db_backup_is_per_profile(env):
+    """Two people's backups land under their own profile tree, not one shared dir."""
+    _, _, david = env
+    alex = profiles.create("alex", "Alex")
+
+    runner.invoke(app, ["db", "init", "--profile", "david"])
+    runner.invoke(app, ["db", "init", "--profile", "alex"])
+    runner.invoke(app, ["db", "backup", "--profile", "david"])
+    runner.invoke(app, ["db", "backup", "--profile", "alex"])
+
+    david_backups = list((david.db_path.parent / "backups").glob("db-*.sqlite"))
+    alex_backups = list((alex.db_path.parent / "backups").glob("db-*.sqlite"))
+    assert len(david_backups) == 1
+    assert len(alex_backups) == 1
+    assert david.db_path.parent != alex.db_path.parent
+
+
 def test_config_init_writes_default_files(env):
     cfg, data, prof = env
     result = runner.invoke(app, ["config", "init"])
     assert result.exit_code == 0, result.output
     assert (cfg / "config.yaml").exists()
-    assert prof.prefs_path.exists()
     assert (cfg / "pdf-template.tex").exists()
+    assert "wrote" in result.output.lower()
+
+    # Both already exist now; nothing left for init to do.
+    result = runner.invoke(app, ["config", "init"])
+    assert result.exit_code == 0
+    assert "no changes" in result.output.lower()
 
 
 def test_config_init_does_not_overwrite(env):

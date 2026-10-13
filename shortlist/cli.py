@@ -20,7 +20,7 @@ from rich.console import Console
 from rich.table import Table
 
 from shortlist import paths, profiles
-from shortlist.config import DEFAULT_CONFIG_YAML, DEFAULT_PREFS_YAML, Prefs, load_prefs
+from shortlist.config import DEFAULT_CONFIG_YAML, Prefs, load_prefs
 from shortlist.sources.ats.ashby import AshbySource
 from shortlist.sources.ats.greenhouse import GreenhouseSource
 from shortlist.sources.ats.lever import LeverSource
@@ -155,7 +155,7 @@ def db_backup(
     if not src.exists():
         console.print(f"[yellow]no db at {src}[/yellow]")
         raise typer.Exit(code=1)
-    backup_dir = paths.data_dir() / "backups"
+    backup_dir = prof.db_path.parent / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     dst = backup_dir / f"db-{stamp}.sqlite"
@@ -170,32 +170,27 @@ app.add_typer(config_app, name="config")
 
 
 @config_app.command("init")
-def config_init(
-    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
-) -> None:
-    """Write default config.yaml if not present; repair a profile's prefs.yaml."""
-    prof = _resolve(profile)
+def config_init() -> None:
+    """Write the shared config.yaml and bundled pdf template if not present."""
     paths.config_dir().mkdir(parents=True, exist_ok=True)
     cfg_path = paths.config_path()
-    prefs_path = prof.prefs_path
+    bundled = _ir.files("shortlist.templates").joinpath("pdf-template.tex")
+    template_path = paths.config_dir() / "pdf-template.tex"
     wrote: list[Path] = []
     if not cfg_path.exists():
         cfg_path.write_text(DEFAULT_CONFIG_YAML)
         wrote.append(cfg_path)
-    if not prefs_path.exists():
-        prefs_path.write_text(DEFAULT_PREFS_YAML)
-        wrote.append(prefs_path)
+    if not template_path.exists():
+        template_path.write_text(bundled.read_text())
+        wrote.append(template_path)
+
     if wrote:
         for p in wrote:
             console.print(f"[green]wrote[/green] {p}")
     else:
-        console.print("[yellow]no changes — both files exist[/yellow]")
-
-    bundled = _ir.files("shortlist.templates").joinpath("pdf-template.tex")
-    target = paths.config_dir() / "pdf-template.tex"
-    if not target.exists():
-        target.write_text(bundled.read_text())
-        console.print(f"[green]wrote[/green] {target}")
+        console.print(
+            "[yellow]no changes — config.yaml and pdf-template.tex already exist[/yellow]"
+        )
 
 
 @config_app.command("show")
@@ -204,12 +199,16 @@ def config_show(
 ) -> None:
     """Print current config.yaml + the profile's prefs.yaml."""
     prof = _resolve(profile)
-    for p in (paths.config_path(), prof.prefs_path):
-        if not p.exists():
-            console.print(f"[yellow]missing[/yellow] {p}")
-            continue
-        console.rule(str(p))
-        console.print(p.read_text())
+    cfg_path = paths.config_path()
+    if cfg_path.exists():
+        console.rule(str(cfg_path))
+        console.print(cfg_path.read_text())
+    else:
+        console.print(f"[yellow]missing[/yellow] {cfg_path}")
+
+    # prof.prefs_path is always present: _resolve() -> profiles.load() repairs it.
+    console.rule(str(prof.prefs_path))
+    console.print(prof.prefs_path.read_text())
 
 
 # --- fetch ----------------------------------------------------------------
@@ -256,9 +255,6 @@ def fetch(
 ) -> None:
     """Pull jobs from all enabled sources."""
     prof = _resolve(profile)
-    if not prof.prefs_path.exists():
-        console.print("[red]error[/red] run `shortlist config init` first")
-        raise typer.Exit(code=2)
     if not prof.db_path.exists():
         console.print("[red]error[/red] run `shortlist db init` first")
         raise typer.Exit(code=2)
@@ -311,7 +307,7 @@ def rank(
 ) -> None:
     """Score stored jobs: hard filter → cosine top-K → Haiku rerank."""
     prof = _resolve(profile)
-    if not prof.prefs_path.exists() or not paths.config_path().exists():
+    if not paths.config_path().exists():
         console.print("[red]error[/red] run `shortlist config init` first")
         raise typer.Exit(code=2)
     if not prof.db_path.exists():
@@ -364,7 +360,7 @@ def tailor_cmd(
 ) -> None:
     """Generate per-job resume + cover + notes (Markdown + PDF)."""
     prof = _resolve(profile)
-    if not paths.config_path().exists() or not prof.prefs_path.exists():
+    if not paths.config_path().exists():
         console.print("[red]error[/red] run `shortlist config init` first")
         raise typer.Exit(code=2)
     if not prof.db_path.exists():
