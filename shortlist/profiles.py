@@ -11,6 +11,7 @@ The directory listing is the registry; there is no separate index file.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from dataclasses import dataclass
@@ -135,3 +136,36 @@ def delete(slug: str) -> None:
     shutil.rmtree(data_root)
     if config_root.exists():
         shutil.rmtree(config_root)
+
+
+class AmbiguousProfileError(ProfileError):
+    pass
+
+
+def resolve(explicit: str | None = None) -> Profile:
+    """Pick the active profile.
+
+    Order: explicit argument, then $SHORTLIST_PROFILE, then the only profile if
+    there is exactly one, then the last used. Raise listing the choices if still
+    unclear, rather than guessing at someone else's data.
+    """
+    from shortlist import state  # late import: state imports paths, profiles imports state
+
+    if explicit:
+        return load(explicit)
+    env = os.environ.get("SHORTLIST_PROFILE")
+    if env:
+        return load(env)
+    available = list_profiles()
+    if not available:
+        raise ProfileNotFoundError("no profiles yet; create one with `shortlist profile create`")
+    if len(available) == 1:
+        return available[0]
+    last = state.get_last_profile()
+    if last is not None:
+        try:
+            return load(last)
+        except ProfileNotFoundError:
+            pass
+    names = ", ".join(p.slug for p in available)
+    raise AmbiguousProfileError(f"several profiles exist ({names}); pass --profile")
