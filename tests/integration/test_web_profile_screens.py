@@ -70,3 +70,28 @@ def test_delete_requires_matching_display_name(client: TestClient) -> None:
     )
     assert right.status_code == 303
     assert profiles.list_profiles() == []
+
+
+def test_create_rejects_blank_display_name_without_writing(client: TestClient) -> None:
+    r = client.post("/profiles", data={"slug": "david", "display_name": "   "})
+    assert r.status_code == 400
+    assert profiles.list_profiles() == []
+
+
+def test_create_trims_display_name_and_trimmed_form_deletes_it(client: TestClient) -> None:
+    r = client.post(
+        "/profiles", data={"slug": "david", "display_name": "  David  "}, follow_redirects=False
+    )
+    assert r.status_code == 303
+    assert profiles.load("david").display_name == "David"
+
+    right = client.post(
+        "/profiles/david/delete", data={"confirm": "David"}, follow_redirects=False
+    )
+    assert right.status_code == 303
+    assert profiles.list_profiles() == []
+
+
+def test_delete_rejects_malformed_slug_with_404(client: TestClient) -> None:
+    r = client.post("/profiles/Has Space/delete", data={"confirm": "whatever"})
+    assert r.status_code == 404
