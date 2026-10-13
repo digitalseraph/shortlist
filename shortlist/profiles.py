@@ -22,7 +22,7 @@ from shortlist import paths
 from shortlist.config import DEFAULT_PREFS_YAML
 from shortlist.store.db import migrate
 
-_SLUG_RE = re.compile(r"^[a-z0-9-]{1,32}$")
+_SLUG_RE = re.compile(r"^[a-z0-9-]{1,32}\Z")
 
 
 class ProfileError(Exception):
@@ -133,4 +133,5 @@ def delete(slug: str) -> None:
     if not (data_root / "profile.yaml").exists():
         raise ProfileNotFoundError(f"no profile {slug!r}")
     shutil.rmtree(data_root)
-    shutil.rmtree(config_root, ignore_errors=True)
+    if config_root.exists():
+        shutil.rmtree(config_root)

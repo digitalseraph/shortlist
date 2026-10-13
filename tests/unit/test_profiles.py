@@ -23,7 +23,19 @@ def test_validate_slug_accepts_url_safe_names(slug: str) -> None:
     assert profiles.validate_slug(slug) == slug
 
 
-@pytest.mark.parametrize("slug", ["", "David", "has space", "dots.dots", "a" * 33, "../escape"])
+@pytest.mark.parametrize(
+    "slug",
+    [
+        "",
+        "David",
+        "has space",
+        "dots.dots",
+        "a" * 33,
+        "../escape",
+        "david\n",
+        "a" * 32 + "\n",
+    ],
+)
 def test_validate_slug_rejects_everything_else(slug: str) -> None:
     with pytest.raises(profiles.InvalidSlugError):
         profiles.validate_slug(slug)
@@ -62,9 +74,9 @@ def test_load_unknown_slug_raises(env: Path) -> None:
 
 
 def test_list_profiles_sorted_by_display_name(env: Path) -> None:
-    profiles.create("b", "Zoe")
-    profiles.create("a", "Adam")
-    assert [p.slug for p in profiles.list_profiles()] == ["a", "b"]
+    profiles.create("z", "Adam")
+    profiles.create("a", "Zoe")
+    assert [p.slug for p in profiles.list_profiles()] == ["z", "a"]
 
 
 def test_list_profiles_empty_when_none_exist(env: Path) -> None:
@@ -78,6 +90,18 @@ def test_delete_removes_both_trees(env: Path) -> None:
     profiles.delete("david")
     assert not data_root.exists()
     assert not config_root.exists()
+    with pytest.raises(profiles.ProfileNotFoundError):
+        profiles.load("david")
+
+
+def test_delete_succeeds_when_config_dir_already_absent(env: Path) -> None:
+    """The ignore_errors removed from delete() was only ever for this case."""
+    prof = profiles.create("david", "David")
+    config_root = prof.prefs_path.parent
+    prof.prefs_path.unlink()
+    config_root.rmdir()
+    profiles.delete("david")
+    assert not prof.db_path.parent.exists()
     with pytest.raises(profiles.ProfileNotFoundError):
         profiles.load("david")
 
