@@ -24,12 +24,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-ProgressFn = Callable[[str], None]
-
-
-def _noop(_: str) -> None:
-    return None
-
 from shortlist.config import Prefs
 from shortlist.models import Job
 from shortlist.ranker.embeddings import EmbeddingService, embed_resume_cached
@@ -41,6 +35,13 @@ from shortlist.ranker.llm_rerank import (
     RerankResult,
 )
 from shortlist.store import db as store_db
+
+ProgressFn = Callable[[str], None]
+
+
+def _noop(_: str) -> None:
+    return None
+
 
 logger = logging.getLogger(__name__)
 

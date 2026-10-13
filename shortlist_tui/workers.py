@@ -12,12 +12,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-ProgressFn = Callable[[str], None]
-
-
-def _noop(_: str) -> None:
-    return None
-
 from shortlist.config import Config, Prefs
 from shortlist.ranker.embeddings import EmbeddingService
 from shortlist.ranker.llm_rerank import LLMReranker
@@ -39,6 +33,12 @@ from shortlist.sources.scraped.otta import OttaBanDetectedError, OttaSource
 from shortlist.sources.scraped.wellfound import WellfoundBanDetectedError, WellfoundSource
 from shortlist.store import db as store_db
 from shortlist.tailor.orchestrator import TailorOrchestrator
+
+ProgressFn = Callable[[str], None]
+
+
+def _noop(_: str) -> None:
+    return None
 
 
 def _build_sources(prefs: Prefs) -> list[Source]:
@@ -78,9 +78,7 @@ def _build_sources(prefs: Prefs) -> list[Source]:
     return sources
 
 
-def fetch_all(
-    db_path: Path, prefs: Prefs, *, progress: ProgressFn | None = None
-) -> str:
+def fetch_all(db_path: Path, prefs: Prefs, *, progress: ProgressFn | None = None) -> str:
     """Pull jobs from every configured source. Returns a summary line."""
     on = progress or _noop
     sources = _build_sources(prefs)

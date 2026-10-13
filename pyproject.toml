@@ -63,6 +63,16 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI requires its dependency markers to be the parameter default, which
+# B008 otherwise flags as a function call in an argument default.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Query",
+]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
