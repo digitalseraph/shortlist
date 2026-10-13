@@ -174,10 +174,19 @@ summary { padding: 0.5rem 0.75rem; cursor: pointer; font-weight: 600; }
   padding: 0.5rem;
   margin-top: 0.5rem;
   font-size: 0.8rem;
+  cursor: grab;
+  user-select: none;
 }
+.card:active { cursor: grabbing; }
 .card a { color: var(--text); text-decoration: none; }
 .card a:hover { color: var(--accent); }
 .card p { margin-top: 0.2rem; }
+.card.dragging { opacity: 0.4; }
+.kanban-col.drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
+.kanban-cards { min-height: 1rem; }
 
 /* ── Settings ── */
 .settings-section {

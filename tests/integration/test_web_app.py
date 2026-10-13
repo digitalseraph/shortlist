@@ -120,3 +120,61 @@ def test_track_valid_transition(client: TestClient, env: tuple[Path, Path]) -> N
     jid = _seed(data / "db.sqlite")
     r = client.post(f"/track/{jid}", data={"status": "tailored"}, follow_redirects=False)
     assert r.status_code == 303
+
+
+def test_applications_kanban_renders_drag_attributes(
+    client: TestClient, env: tuple[Path, Path]
+) -> None:
+    _cfg, data = env
+    db = data / "db.sqlite"
+    jid = _seed(db)
+    transition_status(db, jid, "tailored")
+    r = client.get("/applications")
+    assert r.status_code == 200
+    assert 'draggable="true"' in r.text
+    assert f'data-job-id="{jid}"' in r.text
+    assert 'data-status="tailored"' in r.text
+    # State graph must be embedded for client-side validation
+    assert 'id="kanban-graph"' in r.text
+
+
+def test_applications_move_valid_transition(client: TestClient, env: tuple[Path, Path]) -> None:
+    from shortlist.store.db import get_application, list_jobs
+
+    _cfg, data = env
+    db = data / "db.sqlite"
+    jid = _seed(db)
+    transition_status(db, jid, "tailored")
+
+    r = client.post(f"/applications/move/{jid}", data={"status": "applied"})
+    assert r.status_code == 200
+    assert 'class="toast info"' in r.text
+
+    job = next(j for j in list_jobs(db) if j.id == jid)
+    assert job.status == "applied"
+    app_row = get_application(db, jid)
+    assert app_row is not None and app_row.applied_at is not None
+    assert app_row.applied_via == "web"
+
+
+def test_applications_move_invalid_transition(client: TestClient, env: tuple[Path, Path]) -> None:
+    _cfg, data = env
+    db = data / "db.sqlite"
+    jid = _seed(db)
+    transition_status(db, jid, "tailored")
+    # tailored → interview is not allowed
+    r = client.post(f"/applications/move/{jid}", data={"status": "interview"})
+    assert r.status_code == 400
+    assert 'class="toast error"' in r.text
+
+
+def test_applications_move_escapes_status_in_error(
+    client: TestClient, env: tuple[Path, Path]
+) -> None:
+    """The rejected status is echoed in the error toast; it must not render as markup."""
+    _cfg, data = env
+    db = data / "db.sqlite"
+    jid = _seed(db)
+    r = client.post(f"/applications/move/{jid}", data={"status": "<script>x</script>"})
+    assert r.status_code == 400
+    assert "<script>" not in r.text

@@ -2,19 +2,26 @@
 {% block title %}Applications — Shortlist{% endblock %}
 {% block content %}
 <h1>Applications</h1>
+<p class="dim small">Drag cards between columns to update status. Invalid transitions are blocked.</p>
 <div class="kanban">
   {% for col in columns %}
-  <section class="kanban-col">
+  <section class="kanban-col" data-status="{{ col }}">
     <h2>{{ col }} <span class="count">({{ by_status[col] | length }})</span></h2>
-    {% for row in by_status[col] %}
-    <article class="card">
-      <a href="/job/{{ row.id }}"><strong>{{ row.company }}</strong> — {{ row.title }}</a>
-      <p class="dim">{{ row.location }}{% if row.comp_display != "—" %} · {{ row.comp_display }}{% endif %}</p>
-    </article>
-    {% else %}
-    <p class="empty dim">—</p>
-    {% endfor %}
+    <div class="kanban-cards" data-status="{{ col }}">
+      {% for row in by_status[col] %}
+      <article class="card"
+               draggable="true"
+               data-job-id="{{ row.id }}"
+               data-status="{{ col }}">
+        <a href="/job/{{ row.id }}"><strong>{{ row.company }}</strong> — {{ row.title }}</a>
+        <p class="dim">{{ row.location }}{% if row.comp_display != "—" %} · {{ row.comp_display }}{% endif %}</p>
+      </article>
+      {% endfor %}
+    </div>
+    <p class="empty dim"{% if by_status[col] | length %} hidden{% endif %}>—</p>
   </section>
   {% endfor %}
 </div>
+<script id="kanban-graph" type="application/json">{{ allowed | tojson }}</script>
+<script src="/static/kanban.js"></script>
 {% endblock %}
