@@ -8,21 +8,16 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Form, Request
 from fastapi.responses import HTMLResponse
-from jinja2 import Environment, FileSystemLoader
 
 from shortlist import paths
 from shortlist.config import load_config, load_prefs
 from shortlist.store import db as store_db
 from shortlist_tui.workers import fetch_all, rank_all, rerank_selected, tailor_one
+from shortlist_web.routes._shared import get_env, toast
 
 router = APIRouter()
 
 _LOG_MAX = 200
-
-
-def _get_env(request: Request) -> Environment:
-    templates_dir: Path = request.app.state.templates_dir
-    return Environment(loader=FileSystemLoader(str(templates_dir)), autoescape=True)
 
 
 def _append_log(app: Any, entry: str) -> None:
@@ -33,11 +28,6 @@ def _append_log(app: Any, entry: str) -> None:
     log.append(f"[{stamp}] {entry}")
     if len(log) > _LOG_MAX:
         app.state.task_log = log[-_LOG_MAX:]
-
-
-def _toast(request: Request, message: str, severity: str, *, code: int = 200) -> HTMLResponse:
-    html = _get_env(request).get_template("_toast.html").render(message=message, severity=severity)
-    return HTMLResponse(html, status_code=code)
 
 
 # ---------------------------------------------------------------------------
@@ -118,34 +108,30 @@ def _run_tailor(
 def fetch(background: BackgroundTasks, request: Request) -> HTMLResponse:
     prefs = load_prefs(paths.prefs_path())
     background.add_task(_run_fetch, request.app, paths.db_path(), prefs)
-    return _toast(request, "fetch started", "info")
+    return toast(request, "fetch started", "info")
 
 
 @router.post("/rank", response_class=HTMLResponse)
-def rank(
-    background: BackgroundTasks, request: Request, mode: str = "no-llm"
-) -> HTMLResponse:
+def rank(background: BackgroundTasks, request: Request, mode: str = "no-llm") -> HTMLResponse:
     """Run the ranking pipeline. mode='llm' uses Claude; 'no-llm' is cosine-only."""
     if mode not in ("llm", "no-llm"):
-        return _toast(request, f"invalid mode: {mode}", "error", code=400)
+        return toast(request, f"invalid mode: {mode}", "error", code=400)
     cfg = load_config(paths.config_path())
     prefs = load_prefs(paths.prefs_path())
     resume = cfg.paths.resume.expanduser()
     if not resume.exists():
-        return _toast(request, f"resume not found at {resume}", "error", code=400)
+        return toast(request, f"resume not found at {resume}", "error", code=400)
     client = None
     if mode == "llm":
         key = os.environ.get(cfg.anthropic.key_env_var, "")
         if not key:
-            return _toast(
-                request, f"{cfg.anthropic.key_env_var} not set", "error", code=400
-            )
+            return toast(request, f"{cfg.anthropic.key_env_var} not set", "error", code=400)
         from anthropic import Anthropic
 
         client = Anthropic(api_key=key)
     background.add_task(_run_rank, request.app, paths.db_path(), cfg, prefs, resume, client)
     label = "rank started (LLM)" if client else "rank started (cosine only)"
-    return _toast(request, label, "info")
+    return toast(request, label, "info")
 
 
 @router.post("/rank/selected", response_class=HTMLResponse)
@@ -156,15 +142,15 @@ def rank_selected(
 ) -> HTMLResponse:
     """LLM-rerank the user's checkbox selection from the job list."""
     if not job_ids:
-        return _toast(request, "no jobs selected", "error", code=400)
+        return toast(request, "no jobs selected", "error", code=400)
     cfg = load_config(paths.config_path())
     prefs = load_prefs(paths.prefs_path())
     resume = cfg.paths.resume.expanduser()
     if not resume.exists():
-        return _toast(request, f"resume not found at {resume}", "error", code=400)
+        return toast(request, f"resume not found at {resume}", "error", code=400)
     key = os.environ.get(cfg.anthropic.key_env_var, "")
     if not key:
-        return _toast(request, f"{cfg.anthropic.key_env_var} not set", "error", code=400)
+        return toast(request, f"{cfg.anthropic.key_env_var} not set", "error", code=400)
     from anthropic import Anthropic
 
     background.add_task(
@@ -177,7 +163,7 @@ def rank_selected(
         resume,
         Anthropic(api_key=key),
     )
-    return _toast(request, f"reranking {len(job_ids)} job(s)…", "info")
+    return toast(request, f"reranking {len(job_ids)} job(s)…", "info")
 
 
 @router.post("/tailor/{job_id}", response_class=HTMLResponse)
@@ -186,10 +172,10 @@ def tailor(job_id: int, background: BackgroundTasks, request: Request) -> HTMLRe
     prefs = load_prefs(paths.prefs_path())
     resume = cfg.paths.resume.expanduser()
     if not resume.exists():
-        return _toast(request, f"resume not found at {resume}", "error", code=400)
+        return toast(request, f"resume not found at {resume}", "error", code=400)
     key = os.environ.get(cfg.anthropic.key_env_var, "")
     if not key:
-        return _toast(request, f"{cfg.anthropic.key_env_var} not set", "error", code=400)
+        return toast(request, f"{cfg.anthropic.key_env_var} not set", "error", code=400)
     from anthropic import Anthropic
 
     background.add_task(
@@ -202,7 +188,7 @@ def tailor(job_id: int, background: BackgroundTasks, request: Request) -> HTMLRe
         resume,
         Anthropic(api_key=key),
     )
-    return _toast(request, f"tailoring job {job_id}…", "info")
+    return toast(request, f"tailoring job {job_id}…", "info")
 
 
 @router.post("/jobs/purge-untailored", response_class=HTMLResponse)
@@ -210,7 +196,7 @@ def purge_untailored(request: Request) -> HTMLResponse:
     """Delete every job that has no tailor_outputs row. Destructive."""
     n = store_db.purge_untailored(paths.db_path())
     _append_log(request.app, f"purge: deleted {n} untailored job(s)")
-    return _toast(request, f"deleted {n} untailored job(s)", "info")
+    return toast(request, f"deleted {n} untailored job(s)", "info")
 
 
 @router.get("/status", response_class=HTMLResponse)
@@ -218,6 +204,6 @@ def status(request: Request) -> HTMLResponse:
     """HTMX-polled status feed."""
     log = list(getattr(request.app.state, "task_log", []))
     html = (
-        _get_env(request).get_template("_status.html").render(request=request, log=log[-25:][::-1])
+        get_env(request).get_template("_status.html").render(request=request, log=log[-25:][::-1])
     )
     return HTMLResponse(html)

@@ -9,21 +9,15 @@ from typing import Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from jinja2 import Environment, FileSystemLoader
 from starlette.responses import Response
 
 from shortlist import paths
 from shortlist.store import db as store_db
-from shortlist.store.db import transition_status, update_application
 from shortlist.tracker.state import InvalidStatusTransitionError, allowed_next
 from shortlist_tui.data import JobRow, list_job_rows
+from shortlist_web.routes._shared import apply_status, get_env, toast
 
 router = APIRouter()
-
-
-def _get_env(request: Request) -> Environment:
-    templates_dir: Path = request.app.state.templates_dir
-    return Environment(loader=FileSystemLoader(str(templates_dir)), autoescape=True)
 
 
 def _load_tailor_dir(db_path: Path, job_id: int) -> Path | None:
@@ -105,7 +99,7 @@ def job_list(
         template = "_joblist_table.html"
     else:
         template = "job_list.html"
-    html = _get_env(request).get_template(template).render(**ctx)
+    html = get_env(request).get_template(template).render(**ctx)
     return HTMLResponse(html)
 
 
@@ -122,7 +116,7 @@ def job_detail(request: Request, job_id: int) -> HTMLResponse:
             f = out_dir / f"{stem}.md"
             materials[stem] = f.read_text() if f.exists() else None
     html = (
-        _get_env(request)
+        get_env(request)
         .get_template("job_detail.html")
         .render(
             request=request,
@@ -137,14 +131,7 @@ def job_detail(request: Request, job_id: int) -> HTMLResponse:
 @router.post("/track/{job_id}", response_class=HTMLResponse, response_model=None)
 def track_status(request: Request, job_id: int, status: str = Form(...)) -> Response:
     try:
-        transition_status(paths.db_path(), job_id, status)  # type: ignore[arg-type]
-        if status == "applied":
-            update_application(
-                paths.db_path(),
-                job_id,
-                applied_at=datetime.now(UTC),
-                applied_via="web",
-            )
+        apply_status(paths.db_path(), job_id, status)
     except InvalidStatusTransitionError as e:
-        return HTMLResponse(f'<div class="error">{e}</div>', status_code=400)
+        return toast(request, str(e), "error", code=400)
     return RedirectResponse(f"/job/{job_id}", status_code=303)
