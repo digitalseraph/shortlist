@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from yaml import YAMLError
 
 from shortlist import paths
 
@@ -19,7 +20,12 @@ def get_last_profile() -> str | None:
     path = _state_path()
     if not path.exists():
         return None
-    data: dict[str, Any] = yaml.safe_load(path.read_text()) or {}
+    try:
+        data = yaml.safe_load(path.read_text())
+        if not isinstance(data, dict):
+            return None
+    except YAMLError:
+        return None
     value = data.get("last_profile")
     return str(value) if value else None
 
@@ -30,6 +36,11 @@ def set_last_profile(slug: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data: dict[str, Any] = {}
     if path.exists():
-        data = yaml.safe_load(path.read_text()) or {}
+        try:
+            loaded = yaml.safe_load(path.read_text())
+            if isinstance(loaded, dict):
+                data = loaded
+        except YAMLError:
+            pass
     data["last_profile"] = slug
     path.write_text(yaml.safe_dump(data, sort_keys=False))

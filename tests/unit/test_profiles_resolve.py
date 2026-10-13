@@ -68,3 +68,42 @@ def test_resolve_ignores_stale_last_used(env: Path) -> None:
     state.set_last_profile("deleted-one")
     with pytest.raises(profiles.AmbiguousProfileError):
         profiles.resolve()
+
+
+def test_get_last_profile_handles_malformed_yaml(env: Path) -> None:
+    from shortlist import paths
+    state_file = paths.config_dir() / "state.yaml"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text("invalid: yaml: content: [")
+    assert state.get_last_profile() is None
+
+
+def test_get_last_profile_handles_non_mapping_yaml(env: Path) -> None:
+    from shortlist import paths
+    state_file = paths.config_dir() / "state.yaml"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text("just-a-string")
+    assert state.get_last_profile() is None
+
+
+def test_set_last_profile_repairs_corrupt_state(env: Path) -> None:
+    from shortlist import paths
+    state_file = paths.config_dir() / "state.yaml"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text("invalid: yaml: [")
+    state.set_last_profile("alice")
+    assert state.get_last_profile() == "alice"
+
+
+def test_set_last_profile_preserves_unrelated_keys(env: Path) -> None:
+    import yaml
+
+    from shortlist import paths
+
+    state_file = paths.config_dir() / "state.yaml"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(yaml.safe_dump({"other_key": "other_value"}, sort_keys=False))
+    state.set_last_profile("bob")
+    data = yaml.safe_load(state_file.read_text())
+    assert data["last_profile"] == "bob"
+    assert data["other_key"] == "other_value"
