@@ -8,9 +8,14 @@ expected to show the result for review before saving it.
 from __future__ import annotations
 
 import io
+from collections.abc import Iterable
 from pathlib import Path
 
 MAX_RESUME_BYTES = 2 * 1024 * 1024
+# A resume runs a few thousand characters. This is generous headroom while
+# still refusing a small, highly compressible file (a zip/docx "bomb") that
+# would otherwise expand into megabytes of text during extraction.
+MAX_RESUME_TEXT_CHARS = 1_000_000
 
 _PDF_MAGIC = b"%PDF-"
 _ZIP_MAGIC = b"PK\x03\x04"  # a .docx is a zip container
@@ -27,13 +32,37 @@ def _as_text(data: bytes) -> str:
         raise UnsupportedResumeError("file is not valid UTF-8 text") from exc
 
 
+def _join_capped(parts: Iterable[str], sep: str) -> str:
+    """Join `parts`, raising as soon as the running total exceeds the cap.
+
+    Checks the running total piece by piece instead of joining first and
+    measuring after, so a file that decompresses into something huge is
+    rejected before that huge string is ever fully materialised.
+    """
+    out: list[str] = []
+    total = 0
+    for part in parts:
+        total += len(part)
+        if total > MAX_RESUME_TEXT_CHARS:
+            raise UnsupportedResumeError(
+                f"extracted text is larger than {MAX_RESUME_TEXT_CHARS:,} characters"
+            )
+        out.append(part)
+    return sep.join(out).strip()
+
+
 def _from_pdf(data: bytes) -> str:
     if not data.startswith(_PDF_MAGIC):
         raise UnsupportedResumeError("file does not look like a PDF")
     from pypdf import PdfReader
 
-    reader = PdfReader(io.BytesIO(data))
-    return "\n\n".join(page.extract_text() or "" for page in reader.pages).strip()
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        return _join_capped((page.extract_text() or "" for page in reader.pages), "\n\n")
+    except UnsupportedResumeError:
+        raise
+    except Exception as exc:
+        raise UnsupportedResumeError("file could not be read as a PDF") from exc
 
 
 def _from_docx(data: bytes) -> str:
@@ -41,8 +70,13 @@ def _from_docx(data: bytes) -> str:
         raise UnsupportedResumeError("file does not look like a .docx")
     from docx import Document
 
-    doc = Document(io.BytesIO(data))
-    return "\n".join(p.text for p in doc.paragraphs).strip()
+    try:
+        doc = Document(io.BytesIO(data))
+        return _join_capped((p.text for p in doc.paragraphs), "\n")
+    except UnsupportedResumeError:
+        raise
+    except Exception as exc:
+        raise UnsupportedResumeError("file could not be read as a .docx") from exc
 
 
 def extract_text(data: bytes, filename: str) -> str:

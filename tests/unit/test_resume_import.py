@@ -60,3 +60,48 @@ def test_oversize_rejected() -> None:
 def test_undecodable_text_rejected() -> None:
     with pytest.raises(UnsupportedResumeError):
         extract_text(b"\xff\xfe\x00\x00binary", "resume.txt")
+
+
+def test_corrupt_pdf_rejected() -> None:
+    """Right magic bytes, broken internals: pypdf's own error must not escape."""
+    pytest.importorskip("reportlab")
+    from reportlab.pdfgen.canvas import Canvas
+
+    buf = io.BytesIO()
+    canvas = Canvas(buf)
+    canvas.drawString(72, 720, "David Miller Senior Engineer")
+    canvas.save()
+    data = buf.getvalue()
+    truncated = data[: len(data) // 2]
+    with pytest.raises(UnsupportedResumeError):
+        extract_text(truncated, "resume.pdf")
+
+
+def test_corrupt_docx_rejected() -> None:
+    """Right magic bytes, broken zip/xml internals: the parser's own error must not escape."""
+    from docx import Document
+
+    buf = io.BytesIO()
+    doc = Document()
+    doc.add_paragraph("David Miller")
+    doc.save(buf)
+    data = buf.getvalue()
+    truncated = data[: len(data) // 2]
+    with pytest.raises(UnsupportedResumeError):
+        extract_text(truncated, "resume.docx")
+
+
+def test_oversized_extraction_rejected() -> None:
+    """A small, highly compressible docx must not expand past the text cap."""
+    from docx import Document
+
+    buf = io.BytesIO()
+    doc = Document()
+    chunk = "x" * 100_000
+    for _ in range(20):
+        doc.add_paragraph(chunk)
+    doc.save(buf)
+    data = buf.getvalue()
+    assert len(data) < MAX_RESUME_BYTES  # a compression attack, not just a big file
+    with pytest.raises(UnsupportedResumeError):
+        extract_text(data, "resume.docx")
