@@ -8,7 +8,7 @@
   <td class="dim">{{ row.posted_display }}</td>
   <td><span class="badge status-{{ row.status }}">{{ row.status_display }}</span></td>
   <td>
-    <button hx-post="/tailor/{{ row.id }}" hx-target="#toast" hx-swap="innerHTML">Tailor</button>
+    <button hx-post="/p/{{ active.slug }}/tailor/{{ row.id }}" hx-target="#toast" hx-swap="innerHTML">Tailor</button>
   </td>
   <td>
     <a href="{{ row.url }}" target="_blank" rel="noopener">Open</a>

@@ -45,7 +45,7 @@
     remote only
   </label>
   <button
-    hx-post="/rank/selected"
+    hx-post="/p/{{ active.slug }}/rank/selected"
     hx-include=".job-select:checked"
     hx-target="#toast"
     hx-swap="innerHTML"

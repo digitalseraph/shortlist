@@ -36,10 +36,10 @@
       <option value="/profiles">Manage people…</option>
     </select>
     <div class="actions">
-      <button hx-post="/fetch" hx-target="#toast" hx-swap="innerHTML">Fetch</button>
-      <button hx-post="/rank?mode=no-llm" hx-target="#toast" hx-swap="innerHTML"
+      <button hx-post="/p/{{ active.slug }}/fetch" hx-target="#toast" hx-swap="innerHTML">Fetch</button>
+      <button hx-post="/p/{{ active.slug }}/rank?mode=no-llm" hx-target="#toast" hx-swap="innerHTML"
               title="cosine score every job — free">Rank All</button>
-      <button hx-post="/jobs/purge-untailored"
+      <button hx-post="/p/{{ active.slug }}/jobs/purge-untailored"
               hx-target="#toast" hx-swap="innerHTML"
               hx-confirm="Delete all jobs except tailored ones? This cannot be undone."
               class="danger"
@@ -47,7 +47,7 @@
     </div>
   </header>
   <div id="toast"></div>
-  <div id="status-feed" hx-get="/status" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
+  <div id="status-feed" hx-get="/p/{{ active.slug }}/status" hx-trigger="load, every 2s" hx-swap="innerHTML"></div>
   <main>{% block content %}{% endblock %}</main>
 </body>
 </html>
