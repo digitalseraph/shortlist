@@ -150,9 +150,9 @@ to someone else's data. A handful of pre-multi-person bare paths (`/`, `/applica
 | `cli.py` | Typer app and all CLI subcommands |
 | `config.py` | Pydantic models for `config.yaml` and `prefs.yaml`; `load_config`, `load_prefs` |
 | `models.py` | `RawJob`, `Job`, `Application`, `Contact`, `JobStatus` Literal |
-| `paths.py` | XDG-compliant roots — `config_dir()`, `data_dir()`, `config_path()` |
+| `paths.py` | XDG-compliant roots - `config_dir()`, `data_dir()`, `config_path()` |
 | `profiles.py` | `Profile` dataclass; `create`/`load`/`list_profiles`/`delete`/`resolve` |
-| `state.py` | Cross-run state outside config — which profile slug was last used |
+| `state.py` | Cross-run state outside config - which profile slug was last used |
 
 ### `shortlist/store/`
 

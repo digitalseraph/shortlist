@@ -10,8 +10,8 @@ you and a partner, or you and a friend, both use the same machine.
 ```bash
 shortlist profile create david --name "David"   # creates the "david" profile
 shortlist profile create alex --name "Alex"
-shortlist profile list                           # david  David
-                                                  # alex   Alex
+shortlist profile list                           # alex   Alex
+                                                  # david  David
 shortlist profile delete alex --yes              # removes alex's data; irreversible
 ```
 

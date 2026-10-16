@@ -73,8 +73,9 @@ Every page is scoped to a person at `/p/<slug>/...`, with a header dropdown to s
 | Costs | `/p/<slug>/costs` | This person's spend, plus the combined total across everyone |
 | Settings | `/p/<slug>/settings` | Read-only view of config.yaml, prefs.yaml, and data paths |
 
-Old pre-multi-person bookmarks (`/`, `/job/{id}`, `/applications`, `/costs`, `/settings`) still
-work - they redirect to the active profile's version. See
+Old pre-multi-person bookmarks (`/`, `/applications`, `/costs`, `/settings`, `/resume`) still
+work - they redirect to the active profile's version. A bookmarked `/job/{id}` link does not:
+it 404s and needs the `/p/<slug>/` prefix. See
 [docs/usage.md](docs/usage.md#multiple-people) for `profile create`/`list`/`delete` and
 `--profile`.
 

@@ -40,6 +40,9 @@ def test_profile_create_rejects_blank_name(env: Path) -> None:
     result = runner.invoke(app, ["profile", "create", "david", "--name", "   "])
     assert result.exit_code != 0
     assert profiles.list_profiles() == []
+    # Nothing written to either tree - the guard must run before create() touches disk.
+    assert not (env / "data" / "profiles" / "david").exists()
+    assert not (env / "config" / "profiles" / "david").exists()
 
 
 def test_profile_delete_removes_it(env: Path) -> None:
