@@ -5,8 +5,22 @@ import pytest
 from textual.widgets import Static
 
 from shortlist.models import RawJob
+from shortlist.profiles import Profile
 from shortlist.store.db import migrate, transition_status, upsert_job
 from shortlist_tui.app import ShortlistApp
+
+
+def _profile(db: Path) -> Profile:
+    """Minimal profile pointing at a test database."""
+    return Profile(
+        slug="test",
+        display_name="Test",
+        db_path=db,
+        prefs_path=db.parent / "prefs.yaml",
+        resume_path=db.parent / "resume.md",
+        original_resume_path=db.parent / "resume.original",
+        output_dir=db.parent / "output",
+    )
 
 
 @pytest.mark.asyncio
@@ -28,7 +42,7 @@ async def test_applications_board_groups_by_status(tmp_path: Path):
     )
     transition_status(db, job.id, "tailored")
 
-    async with ShortlistApp(db_path=db).run_test() as pilot:
+    async with ShortlistApp(profile=_profile(db)).run_test() as pilot:
         await pilot.pause()
         await pilot.press("a")
         await pilot.pause()

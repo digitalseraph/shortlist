@@ -20,6 +20,19 @@
   </div>
 </div>
 
+<h2>All people</h2>
+<table class="job-table">
+  <thead>
+    <tr><th>Person</th><th>Total</th></tr>
+  </thead>
+  <tbody>
+    {% for prof, total in combined %}
+    <tr><td>{{ prof.display_name }}</td><td class="comp">${{ "%.2f"|format(total) }}</td></tr>
+    {% endfor %}
+    <tr><th>Combined</th><th>${{ "%.2f"|format(combined_sum) }}</th></tr>
+  </tbody>
+</table>
+
 <h2>By model</h2>
 {% if by_model %}
 <table class="job-table">
