@@ -8,9 +8,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from shortlist import profiles
 from shortlist.models import RawJob
-from shortlist.store.db import migrate, transition_status, update_score, upsert_job
+from shortlist.profiles import Profile
+from shortlist.store.db import transition_status, update_score, upsert_job
 from shortlist_web.app import create_app
+
+PREFIX = "/p/test"
 
 
 @pytest.fixture
@@ -25,11 +29,9 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
 
 
 @pytest.fixture
-def client(env: tuple[Path, Path]) -> TestClient:
-    _cfg, data = env
-    db = data / "db.sqlite"
-    migrate(db)
-    return TestClient(create_app())
+def client(env: tuple[Path, Path]) -> tuple[TestClient, Profile]:
+    prof = profiles.create("test", "Test Person")
+    return TestClient(create_app()), prof
 
 
 def _seed(
@@ -56,80 +58,80 @@ def _seed(
     return job.id
 
 
-def test_root_renders_empty(client: TestClient) -> None:
-    r = client.get("/")
+def test_root_renders_empty(client: tuple[TestClient, Profile]) -> None:
+    tc, _prof = client
+    r = tc.get(f"{PREFIX}/")
     assert r.status_code == 200
     assert "Shortlist" in r.text
 
 
-def test_root_lists_jobs(client: TestClient, env: tuple[Path, Path]) -> None:
-    _cfg, data = env
-    _seed(data / "db.sqlite", score=87)
-    r = client.get("/")
+def test_root_lists_jobs(client: tuple[TestClient, Profile]) -> None:
+    tc, prof = client
+    _seed(prof.db_path, score=87)
+    r = tc.get(f"{PREFIX}/")
     assert "Acme" in r.text
     assert "Senior Backend Engineer" in r.text
     assert "87" in r.text
 
 
-def test_search_filter(client: TestClient, env: tuple[Path, Path]) -> None:
-    _cfg, data = env
-    _seed(data / "db.sqlite", "a", "Senior Backend Engineer")
-    _seed(data / "db.sqlite", "b", "Frontend Engineer")
-    r = client.get("/?q=frontend")
+def test_search_filter(client: tuple[TestClient, Profile]) -> None:
+    tc, prof = client
+    _seed(prof.db_path, "a", "Senior Backend Engineer")
+    _seed(prof.db_path, "b", "Frontend Engineer")
+    r = tc.get(f"{PREFIX}/?q=frontend")
     assert "Frontend" in r.text
     assert "Backend" not in r.text
 
 
-def test_job_detail(client: TestClient, env: tuple[Path, Path]) -> None:
-    _cfg, data = env
-    jid = _seed(data / "db.sqlite", score=80)
-    r = client.get(f"/job/{jid}")
+def test_job_detail(client: tuple[TestClient, Profile]) -> None:
+    tc, prof = client
+    jid = _seed(prof.db_path, score=80)
+    r = tc.get(f"{PREFIX}/job/{jid}")
     assert r.status_code == 200
     assert "Senior Backend Engineer" in r.text
 
 
-def test_job_detail_404(client: TestClient) -> None:
-    assert client.get("/job/9999").status_code == 404
+def test_job_detail_404(client: tuple[TestClient, Profile]) -> None:
+    tc, _prof = client
+    assert tc.get(f"{PREFIX}/job/9999").status_code == 404
 
 
-def test_applications_groups_by_status(client: TestClient, env: tuple[Path, Path]) -> None:
-    _cfg, data = env
-    jid = _seed(data / "db.sqlite")
-    transition_status(data / "db.sqlite", jid, "tailored")
-    r = client.get("/applications")
+def test_applications_groups_by_status(client: tuple[TestClient, Profile]) -> None:
+    tc, prof = client
+    jid = _seed(prof.db_path)
+    transition_status(prof.db_path, jid, "tailored")
+    r = tc.get(f"{PREFIX}/applications")
     assert "tailored" in r.text.lower()
     assert "Acme" in r.text
 
 
-def test_settings_renders_when_config_missing(client: TestClient) -> None:
-    r = client.get("/settings")
+def test_settings_renders_when_config_missing(client: tuple[TestClient, Profile]) -> None:
+    tc, _prof = client
+    r = tc.get(f"{PREFIX}/settings")
     assert r.status_code == 200
     assert "config" in r.text.lower()
 
 
-def test_track_invalid_transition(client: TestClient, env: tuple[Path, Path]) -> None:
-    _cfg, data = env
-    jid = _seed(data / "db.sqlite")
+def test_track_invalid_transition(client: tuple[TestClient, Profile]) -> None:
+    tc, prof = client
+    jid = _seed(prof.db_path)
     # new → interview is not a valid transition
-    r = client.post(f"/track/{jid}", data={"status": "interview"})
+    r = tc.post(f"{PREFIX}/track/{jid}", data={"status": "interview"})
     assert r.status_code == 400
 
 
-def test_track_valid_transition(client: TestClient, env: tuple[Path, Path]) -> None:
-    _cfg, data = env
-    jid = _seed(data / "db.sqlite")
-    r = client.post(f"/track/{jid}", data={"status": "tailored"}, follow_redirects=False)
+def test_track_valid_transition(client: tuple[TestClient, Profile]) -> None:
+    tc, prof = client
+    jid = _seed(prof.db_path)
+    r = tc.post(f"{PREFIX}/track/{jid}", data={"status": "tailored"}, follow_redirects=False)
     assert r.status_code == 303
 
 
-def test_applications_kanban_renders_drag_attributes(
-    client: TestClient, env: tuple[Path, Path]
-) -> None:
-    _cfg, data = env
-    db = data / "db.sqlite"
-    jid = _seed(db)
-    transition_status(db, jid, "tailored")
-    r = client.get("/applications")
+def test_applications_kanban_renders_drag_attributes(client: tuple[TestClient, Profile]) -> None:
+    tc, prof = client
+    jid = _seed(prof.db_path)
+    transition_status(prof.db_path, jid, "tailored")
+    r = tc.get(f"{PREFIX}/applications")
     assert r.status_code == 200
     assert 'draggable="true"' in r.text
     assert f'data-job-id="{jid}"' in r.text
@@ -138,43 +140,46 @@ def test_applications_kanban_renders_drag_attributes(
     assert 'id="kanban-graph"' in r.text
 
 
-def test_applications_move_valid_transition(client: TestClient, env: tuple[Path, Path]) -> None:
+def test_applications_move_valid_transition(client: tuple[TestClient, Profile]) -> None:
     from shortlist.store.db import get_application, list_jobs
 
-    _cfg, data = env
-    db = data / "db.sqlite"
-    jid = _seed(db)
-    transition_status(db, jid, "tailored")
+    tc, prof = client
+    jid = _seed(prof.db_path)
+    transition_status(prof.db_path, jid, "tailored")
 
-    r = client.post(f"/applications/move/{jid}", data={"status": "applied"})
+    r = tc.post(f"{PREFIX}/applications/move/{jid}", data={"status": "applied"})
     assert r.status_code == 200
     assert 'class="toast info"' in r.text
 
-    job = next(j for j in list_jobs(db) if j.id == jid)
+    job = next(j for j in list_jobs(prof.db_path) if j.id == jid)
     assert job.status == "applied"
-    app_row = get_application(db, jid)
+    app_row = get_application(prof.db_path, jid)
     assert app_row is not None and app_row.applied_at is not None
     assert app_row.applied_via == "web"
 
 
-def test_applications_move_invalid_transition(client: TestClient, env: tuple[Path, Path]) -> None:
-    _cfg, data = env
-    db = data / "db.sqlite"
-    jid = _seed(db)
-    transition_status(db, jid, "tailored")
+def test_applications_move_invalid_transition(client: tuple[TestClient, Profile]) -> None:
+    tc, prof = client
+    jid = _seed(prof.db_path)
+    transition_status(prof.db_path, jid, "tailored")
     # tailored → interview is not allowed
-    r = client.post(f"/applications/move/{jid}", data={"status": "interview"})
+    r = tc.post(f"{PREFIX}/applications/move/{jid}", data={"status": "interview"})
     assert r.status_code == 400
     assert 'class="toast error"' in r.text
 
 
-def test_applications_move_escapes_status_in_error(
-    client: TestClient, env: tuple[Path, Path]
-) -> None:
+def test_applications_move_escapes_status_in_error(client: tuple[TestClient, Profile]) -> None:
     """The rejected status is echoed in the error toast; it must not render as markup."""
-    _cfg, data = env
-    db = data / "db.sqlite"
-    jid = _seed(db)
-    r = client.post(f"/applications/move/{jid}", data={"status": "<script>x</script>"})
+    tc, prof = client
+    jid = _seed(prof.db_path)
+    r = tc.post(f"{PREFIX}/applications/move/{jid}", data={"status": "<script>x</script>"})
     assert r.status_code == 400
     assert "<script>" not in r.text
+
+
+def test_bare_path_redirects_to_active_profile(client: tuple[TestClient, Profile]) -> None:
+    """A pre-profile bookmark still works: it is sent to the one active profile."""
+    tc, prof = client
+    r = tc.get("/applications?q=engineer", follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers["location"] == f"/p/{prof.slug}/applications?q=engineer"
