@@ -78,6 +78,17 @@ def test_fails_when_no_seniority_match():
     assert passes(job, prefs) is False
 
 
+def test_empty_seniority_skips_the_seniority_gate():
+    """Fields like teaching have no seniority words in their titles."""
+    job = _job(title="French Teacher")
+    assert passes(job, _prefs(titles=["French Teacher"], seniority=[])) is True
+
+
+def test_empty_seniority_still_requires_a_title_match():
+    job = _job(title="Math Teacher")
+    assert passes(job, _prefs(titles=["French Teacher"], seniority=[])) is False
+
+
 @given(st.text(min_size=2, max_size=20).filter(lambda s: s.strip()))
 def test_random_excluded_keyword_filters(kw: str):
     prefs = _prefs(exclude_keywords=[kw])

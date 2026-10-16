@@ -2,7 +2,8 @@
 
 A job `passes` only if all of the following hold:
   - At least one preferred title matches as a case-insensitive substring of job.title.
-  - At least one preferred seniority appears in job.title (case-insensitive).
+  - At least one preferred seniority appears in job.title (case-insensitive),
+    unless the seniority list is empty.
   - No `exclude_keywords` appears (case-insensitive) in title or description.
   - Location is acceptable: `job.remote` and `prefs.remote_ok`, OR
     `job.location` substring-matches one of `prefs.locations`.
@@ -35,7 +36,9 @@ def passes(job: Job, prefs: Prefs) -> bool:
     if prefs.titles and not _ci_any(prefs.titles, title) and not _ci_any(prefs.seniority, title):
         return False
 
-    if not _ci_any(prefs.seniority, title):
+    # An empty seniority list turns the gate off, for fields whose titles
+    # carry no seniority words (e.g. "French Teacher").
+    if prefs.seniority and not _ci_any(prefs.seniority, title):
         return False
 
     location_ok = (job.remote and prefs.remote_ok) or (
