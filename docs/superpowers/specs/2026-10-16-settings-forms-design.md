@@ -1,7 +1,7 @@
 # Settings forms and search locations
 
 Date: 2026-10-16
-Status: approved design, not yet implemented
+Status: implemented
 
 ## Problem
 
