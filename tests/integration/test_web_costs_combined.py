@@ -49,3 +49,15 @@ def test_costs_page_works_with_one_profile(client: TestClient) -> None:
     _add_cost(david.db_path, 0.40)
     r = client.get("/p/david/costs")
     assert "0.40" in r.text
+
+
+def test_combined_skips_a_profile_with_an_unreadable_database(client: TestClient) -> None:
+    """A present-but-schemaless database must not blank the page for everyone."""
+    david = profiles.create("david", "David")
+    alex = profiles.create("alex", "Alex")
+    _add_cost(david.db_path, 1.25)
+    alex.db_path.write_bytes(b"")  # exists, but has no tables - simulates a broken db
+    r = client.get("/p/david/costs")
+    assert r.status_code == 200
+    assert "1.25" in r.text
+    assert "<td>Alex</td>" not in r.text

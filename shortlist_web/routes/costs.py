@@ -161,11 +161,18 @@ def combined_totals() -> list[tuple[Profile, float]]:
     for prof in profiles.list_profiles():
         if not prof.db_path.exists():
             continue
-        with store_db.connect(prof.db_path) as conn:
-            runs = conn.execute("SELECT COALESCE(SUM(cost_usd), 0) FROM scoring_runs").fetchone()[0]
-            tailors = conn.execute(
-                "SELECT COALESCE(SUM(cost_usd), 0) FROM tailor_outputs"
-            ).fetchone()[0]
+        try:
+            with store_db.connect(prof.db_path) as conn:
+                runs = conn.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0) FROM scoring_runs"
+                ).fetchone()[0]
+                tailors = conn.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0) FROM tailor_outputs"
+                ).fetchone()[0]
+        except sqlite3.Error:
+            # A present-but-unreadable database (e.g. missing schema) must not
+            # blank the page for everyone else - skip just this profile.
+            continue
         totals.append((prof, float(runs) + float(tailors)))
     return totals
 
