@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse, Response
 
 from shortlist import profiles
-from shortlist_web.routes import actions, applications, costs, jobs, settings
+from shortlist_web.routes import actions, applications, costs, jobs, resume, settings
 from shortlist_web.routes import profiles as profiles_router
 
 # Pages that existed before profiles were URL-scoped. A request for one of
@@ -59,11 +59,11 @@ def create_app() -> FastAPI:
         return RedirectResponse(target, status_code=307)
 
     # profiles.router is unprefixed: it exists precisely for when there is no
-    # active profile. resume.router lands in a later task; settings.router
-    # converts to the prefix in its own task too.
+    # active profile. settings.router converts to the prefix in its own task
+    # too.
     app.include_router(profiles_router.router)
     app.include_router(settings.router)
-    for router in (jobs.router, applications.router, costs.router, actions.router):
+    for router in (jobs.router, applications.router, costs.router, actions.router, resume.router):
         app.include_router(router, prefix="/p/{slug}")
 
     return app
