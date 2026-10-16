@@ -8,6 +8,7 @@ expected to show the result for review before saving it.
 from __future__ import annotations
 
 import io
+import zipfile
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -16,6 +17,12 @@ MAX_RESUME_BYTES = 2 * 1024 * 1024
 # still refusing a small, highly compressible file (a zip/docx "bomb") that
 # would otherwise expand into megabytes of text during extraction.
 MAX_RESUME_TEXT_CHARS = 1_000_000
+# python-docx parses a .docx's whole XML tree into memory before yielding a
+# single paragraph, so MAX_RESUME_TEXT_CHARS alone is too late: a small zip
+# can already have cost hundreds of MB by the time the first paragraph is
+# checked. Reading the zip's central directory (no decompression) catches
+# that before `Document(...)` is ever called.
+MAX_RESUME_UNCOMPRESSED_BYTES = 32 * 1024 * 1024
 
 _PDF_MAGIC = b"%PDF-"
 _ZIP_MAGIC = b"PK\x03\x04"  # a .docx is a zip container
@@ -71,6 +78,13 @@ def _from_docx(data: bytes) -> str:
     from docx import Document
 
     try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            uncompressed = sum(info.file_size for info in zf.infolist())
+        if uncompressed > MAX_RESUME_UNCOMPRESSED_BYTES:
+            raise UnsupportedResumeError(
+                "uncompressed content is larger than "
+                f"{MAX_RESUME_UNCOMPRESSED_BYTES // (1024 * 1024)} MB"
+            )
         doc = Document(io.BytesIO(data))
         return _join_capped((p.text for p in doc.paragraphs), "\n")
     except UnsupportedResumeError:
