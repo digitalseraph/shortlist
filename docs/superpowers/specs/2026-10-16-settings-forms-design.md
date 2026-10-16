@@ -44,7 +44,8 @@ Prefs files without the field still load.
 
 ### Place list
 
-`shortlist/data/us_places.txt`, one `City, ST` per line, sorted, deduplicated.
+`shortlist/data/us_places.txt`, one `City, ST` per line, deduplicated, largest
+population first so suggestions lead with the likeliest place.
 Built from GeoNames `cities1000` (populated places of 1,000 or more) filtered
 to country `US`, by `scripts/build_us_places.py`. The output is committed; the
 application never downloads anything. GeoNames data is CC BY 4.0 and the README
@@ -101,10 +102,13 @@ editors with their routes and behaviour unchanged.
 
 ### Location inputs
 
-Each location is a text input bound to a `<datalist>`. Typing requests
-`GET /places?q=<text>` through HTMX with a 200 ms delay; the response is up to
-10 `<option>` elements swapped into that input's datalist. Add and remove are a
-few lines of plain JavaScript. Without JavaScript the inputs still submit;
+Each location is a text input bound to one shared `<datalist>`. Typing
+requests `GET /places?q=<text>` after a 200 ms pause; the response is up to 10
+`<option>` elements that replace the datalist's contents. This is a few lines
+of plain JavaScript in `static/settings.js` rather than HTMX, because HTMX
+would send the value under the input's own name (`search_locations`) rather
+than `q`. Add and remove live in the same file and use event delegation, so
+added rows need no wiring. Without JavaScript the inputs still submit;
 there are no suggestions.
 
 ## Saving
