@@ -242,8 +242,6 @@ def status(request: Request, profile: Profile = Depends(profile_dep)) -> HTMLRes
     log: list[tuple[str, str, str]] = list(getattr(request.app.state, "task_log", []))
     mine = [f"[{stamp}] {msg}" for slug, stamp, msg in log if slug == profile.slug]
     html = (
-        get_env(request)
-        .get_template("_status.html")
-        .render(request=request, log=mine[-25:][::-1])
+        get_env(request).get_template("_status.html").render(request=request, log=mine[-25:][::-1])
     )
     return HTMLResponse(html)

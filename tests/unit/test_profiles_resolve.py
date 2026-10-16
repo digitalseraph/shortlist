@@ -72,6 +72,7 @@ def test_resolve_ignores_stale_last_used(env: Path) -> None:
 
 def test_get_last_profile_handles_malformed_yaml(env: Path) -> None:
     from shortlist import paths
+
     state_file = paths.config_dir() / "state.yaml"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text("invalid: yaml: content: [")
@@ -80,6 +81,7 @@ def test_get_last_profile_handles_malformed_yaml(env: Path) -> None:
 
 def test_get_last_profile_handles_non_mapping_yaml(env: Path) -> None:
     from shortlist import paths
+
     state_file = paths.config_dir() / "state.yaml"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text("just-a-string")
@@ -88,6 +90,7 @@ def test_get_last_profile_handles_non_mapping_yaml(env: Path) -> None:
 
 def test_set_last_profile_repairs_corrupt_state(env: Path) -> None:
     from shortlist import paths
+
     state_file = paths.config_dir() / "state.yaml"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text("invalid: yaml: [")

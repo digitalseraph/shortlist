@@ -658,13 +658,13 @@ For each of `fetch`, `rank`, `tailor_cmd`, `list_jobs_cmd`, `track_cmd`, `contac
 `contacts_list`, `contacts_remove`, `sources_clear_cooldown`, `sources_status`,
 `db_init`, `db_status`, `db_backup`, add this as the last parameter:
 
-```python
+```text
     profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
 ```
 
 open the body with:
 
-```python
+```text
     prof = _resolve(profile)
 ```
 
@@ -838,7 +838,7 @@ def page_context(request: Request, profile: Profile, **extra: object) -> dict[st
 
 - [ ] **Step 4: Mount the page routers under the prefix in `shortlist_web/app.py`**
 
-```python
+```text
     app.include_router(profiles_routes.router)  # unprefixed: /profiles/*
     for router in (
         jobs.router,
@@ -878,13 +878,13 @@ async def _redirect_bare_paths(request: Request, call_next: Any) -> Response:
 
 In `jobs.py`, `applications.py` and `costs.py`, change each handler signature from
 
-```python
+```text
 def applications(request: Request) -> HTMLResponse:
 ```
 
 to
 
-```python
+```text
 def applications(
     request: Request, profile: Profile = Depends(profile_dep)
 ) -> HTMLResponse:
@@ -989,9 +989,7 @@ def test_delete_requires_matching_display_name(client: TestClient) -> None:
     assert wrong.status_code == 400
     assert profiles.load("david").slug == "david"
 
-    right = client.post(
-        "/profiles/david/delete", data={"confirm": "David"}, follow_redirects=False
-    )
+    right = client.post("/profiles/david/delete", data={"confirm": "David"}, follow_redirects=False)
     assert right.status_code == 303
     assert profiles.list_profiles() == []
 ```
@@ -1225,9 +1223,7 @@ def status(request: Request, profile: Profile = Depends(profile_dep)) -> HTMLRes
     log: list[tuple[str, str, str]] = list(getattr(request.app.state, "task_log", []))
     mine = [f"[{stamp}] {msg}" for slug, stamp, msg in log if slug == profile.slug]
     html = (
-        get_env(request)
-        .get_template("_status.html")
-        .render(request=request, log=mine[-25:][::-1])
+        get_env(request).get_template("_status.html").render(request=request, log=mine[-25:][::-1])
     )
     return HTMLResponse(html)
 ```
@@ -1948,7 +1944,7 @@ into the template through `page_context`.
 
 - [ ] **Step 5: Resolve one profile at TUI startup in `shortlist_tui/app.py`**
 
-```python
+```text
     def __init__(self, profile: Profile | None = None) -> None:
         super().__init__()
         self.profile = profile if profile is not None else profiles.resolve()

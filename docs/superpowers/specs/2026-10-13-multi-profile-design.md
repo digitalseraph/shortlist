@@ -77,7 +77,7 @@ a default `prefs.yaml`, rather than being hidden from the list.
 ```python
 @dataclass(frozen=True)
 class Profile:
-    slug: str          # url-safe [a-z0-9-], immutable once created
+    slug: str  # url-safe [a-z0-9-], immutable once created
     display_name: str  # free text, renameable
     db_path: Path
     prefs_path: Path

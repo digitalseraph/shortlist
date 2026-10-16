@@ -65,9 +65,7 @@ def test_delete_requires_matching_display_name(client: TestClient) -> None:
     assert wrong.status_code == 400
     assert profiles.load("david").slug == "david"
 
-    right = client.post(
-        "/profiles/david/delete", data={"confirm": "David"}, follow_redirects=False
-    )
+    right = client.post("/profiles/david/delete", data={"confirm": "David"}, follow_redirects=False)
     assert right.status_code == 303
     assert profiles.list_profiles() == []
 
@@ -85,9 +83,7 @@ def test_create_trims_display_name_and_trimmed_form_deletes_it(client: TestClien
     assert r.status_code == 303
     assert profiles.load("david").display_name == "David"
 
-    right = client.post(
-        "/profiles/david/delete", data={"confirm": "David"}, follow_redirects=False
-    )
+    right = client.post("/profiles/david/delete", data={"confirm": "David"}, follow_redirects=False)
     assert right.status_code == 303
     assert profiles.list_profiles() == []
 
