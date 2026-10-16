@@ -13,7 +13,7 @@
                draggable="true"
                data-job-id="{{ row.id }}"
                data-status="{{ col }}">
-        <a href="/job/{{ row.id }}"><strong>{{ row.company }}</strong> — {{ row.title }}</a>
+        <a href="/p/{{ active.slug }}/job/{{ row.id }}"><strong>{{ row.company }}</strong> — {{ row.title }}</a>
         <p class="dim">{{ row.location }}{% if row.comp_display != "—" %} · {{ row.comp_display }}{% endif %}</p>
       </article>
       {% endfor %}
@@ -23,5 +23,6 @@
   {% endfor %}
 </div>
 <script id="kanban-graph" type="application/json">{{ allowed | tojson }}</script>
+<script>const KANBAN_SLUG = {{ active.slug | tojson }};</script>
 <script src="/static/kanban.js"></script>
 {% endblock %}

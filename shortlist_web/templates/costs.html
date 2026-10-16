@@ -20,6 +20,19 @@
   </div>
 </div>
 
+<h2>All people</h2>
+<table class="job-table">
+  <thead>
+    <tr><th>Person</th><th>Total</th></tr>
+  </thead>
+  <tbody>
+    {% for prof, total in combined %}
+    <tr><td>{{ prof.display_name }}</td><td class="comp">${{ "%.2f"|format(total) }}</td></tr>
+    {% endfor %}
+    <tr><th>Combined</th><th>${{ "%.2f"|format(combined_sum) }}</th></tr>
+  </tbody>
+</table>
+
 <h2>By model</h2>
 {% if by_model %}
 <table class="job-table">
@@ -75,7 +88,7 @@
     <tr>
       <td class="dim">{{ t.rendered_at.strftime("%Y-%m-%d %H:%M") if t.rendered_at else "—" }}</td>
       <td>{{ t.company }}</td>
-      <td><a href="/job/{{ t.job_id }}">{{ t.title }}</a></td>
+      <td><a href="/p/{{ active.slug }}/job/{{ t.job_id }}">{{ t.title }}</a></td>
       <td class="comp">${{ "%.4f"|format(t.cost_usd) }}</td>
       <td class="dim">{{ t.tokens_in }}/{{ t.tokens_out }}</td>
     </tr>

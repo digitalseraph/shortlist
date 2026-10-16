@@ -26,6 +26,8 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "jinja2>=3.1",
     "python-multipart>=0.0.31",
+    "pypdf>=6.1",
+    "python-docx>=1.2",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +41,7 @@ dev = [
     "mypy>=1.10",
     "types-PyYAML",
     "textual-dev>=1.7",
+    "reportlab>=4.0",
 ]
 
 [project.scripts]

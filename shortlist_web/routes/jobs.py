@@ -7,15 +7,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.responses import Response
 
-from shortlist import paths
+from shortlist.profiles import Profile
 from shortlist.store import db as store_db
 from shortlist.tracker.state import InvalidStatusTransitionError, allowed_next
 from shortlist_tui.data import JobRow, list_job_rows
-from shortlist_web.routes._shared import apply_status, get_env, toast
+from shortlist_web.routes._shared import apply_status, get_env, page_context, profile_dep, toast
 
 router = APIRouter()
 
@@ -54,6 +54,7 @@ _MAX_AGE_CHOICES = (7, 30, 90, 365, 0)  # 0 = "all"
 @router.get("/", response_class=HTMLResponse)
 def job_list(
     request: Request,
+    profile: Profile = Depends(profile_dep),
     q: str | None = None,
     min_score: int = 0,
     max_age_days: int = 365,
@@ -68,7 +69,7 @@ def job_list(
     if max_age_days not in _MAX_AGE_CHOICES:
         max_age_days = 365
     rows = list_job_rows(
-        paths.db_path(),
+        profile.db_path,
         min_score=min_score if min_score else None,
         max_age_days=max_age_days if max_age_days else None,
     )
@@ -78,17 +79,18 @@ def job_list(
     if remote_only:
         rows = [r for r in rows if r.remote]
     rows = _sort_rows(rows, sort, dir)
-    ctx = {
-        "request": request,
-        "rows": rows,
-        "q": q or "",
-        "min_score": min_score,
-        "max_age_days": max_age_days,
-        "max_age_choices": _MAX_AGE_CHOICES,
-        "remote_only": remote_only,
-        "sort": sort,
-        "dir": dir,
-    }
+    ctx = page_context(
+        request,
+        profile,
+        rows=rows,
+        q=q or "",
+        min_score=min_score,
+        max_age_days=max_age_days,
+        max_age_choices=_MAX_AGE_CHOICES,
+        remote_only=remote_only,
+        sort=sort,
+        dir=dir,
+    )
     # HTMX swaps target #joblist-wrap (sort clicks) or #job-tbody (filter inputs).
     # Filter inputs use hx-target="#job-tbody" and request just rows; sort
     # links target the wrap and request the full table.
@@ -104,12 +106,14 @@ def job_list(
 
 
 @router.get("/job/{job_id}", response_class=HTMLResponse)
-def job_detail(request: Request, job_id: int) -> HTMLResponse:
-    jobs = [j for j in store_db.list_jobs(paths.db_path()) if j.id == job_id]
+def job_detail(
+    request: Request, job_id: int, profile: Profile = Depends(profile_dep)
+) -> HTMLResponse:
+    jobs = [j for j in store_db.list_jobs(profile.db_path) if j.id == job_id]
     if not jobs:
         raise HTTPException(404, "job not found")
     job = jobs[0]
-    out_dir = _load_tailor_dir(paths.db_path(), job_id)
+    out_dir = _load_tailor_dir(profile.db_path, job_id)
     materials: dict[str, str | None] = {}
     if out_dir and out_dir.exists():
         for stem in ("resume", "cover", "notes"):
@@ -119,19 +123,29 @@ def job_detail(request: Request, job_id: int) -> HTMLResponse:
         get_env(request)
         .get_template("job_detail.html")
         .render(
-            request=request,
-            job=job,
-            materials=materials,
-            allowed_next=sorted(allowed_next(job.status)),
+            **page_context(
+                request,
+                profile,
+                job=job,
+                materials=materials,
+                allowed_next=sorted(allowed_next(job.status)),
+            )
         )
     )
     return HTMLResponse(html)
 
 
 @router.post("/track/{job_id}", response_class=HTMLResponse, response_model=None)
-def track_status(request: Request, job_id: int, status: str = Form(...)) -> Response:
+def track_status(
+    request: Request,
+    job_id: int,
+    status: str = Form(...),
+    profile: Profile = Depends(profile_dep),
+) -> Response:
     try:
-        apply_status(paths.db_path(), job_id, status)
+        apply_status(profile.db_path, job_id, status)
     except InvalidStatusTransitionError as e:
         return toast(request, str(e), "error", code=400)
-    return RedirectResponse(f"/job/{job_id}", status_code=303)
+    except ValueError as e:
+        return toast(request, str(e), "error", code=404)
+    return RedirectResponse(f"/p/{profile.slug}/job/{job_id}", status_code=303)

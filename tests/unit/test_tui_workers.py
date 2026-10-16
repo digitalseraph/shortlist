@@ -62,7 +62,7 @@ def test_tailor_one_writes_outputs(tmp_path: Path):
         {
             "anthropic": {"key_source": "env", "key_env_var": "ANTHROPIC_API_KEY"},
             "budget": {"daily_usd": 5.0, "monthly_usd": 60.0},
-            "paths": {"resume": str(resume), "output_dir": str(out_root)},
+            "paths": {},
             "sources": {},
             "ranker": {
                 "top_k_for_llm_rerank": 30,
@@ -74,7 +74,13 @@ def test_tailor_one_writes_outputs(tmp_path: Path):
     )
 
     summary = tailor_one(
-        db, job.id, cfg=cfg, prefs=_prefs(), resume_path=resume, anthropic_client=fake_anth
+        db,
+        job.id,
+        cfg=cfg,
+        prefs=_prefs(),
+        resume_path=resume,
+        output_root=out_root,
+        anthropic_client=fake_anth,
     )
     assert "tailored" in summary
     dirs = list(out_root.iterdir())

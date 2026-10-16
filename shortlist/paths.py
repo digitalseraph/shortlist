@@ -31,11 +31,3 @@ def data_dir() -> Path:
 
 def config_path() -> Path:
     return config_dir() / "config.yaml"
-
-
-def prefs_path() -> Path:
-    return config_dir() / "prefs.yaml"
-
-
-def db_path() -> Path:
-    return data_dir() / "db.sqlite"

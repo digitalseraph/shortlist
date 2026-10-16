@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader
 
-from shortlist import paths
+from shortlist import profiles
+from shortlist.profiles import Profile
 from shortlist.store import db as store_db
+from shortlist_web.routes._shared import page_context, profile_dep
 
 router = APIRouter()
 
@@ -148,8 +150,43 @@ def _aggregate(db_path: Path) -> dict[str, object]:
     }
 
 
+def combined_totals() -> list[tuple[Profile, float]]:
+    """Total spend per profile, read from each database.
+
+    A fan-out read rather than a shared ledger: cost rows stay attached to the
+    scoring run and tailor output that caused them, so this view cannot drift
+    from the per-person numbers.
+    """
+    totals: list[tuple[Profile, float]] = []
+    for prof in profiles.list_profiles():
+        if not prof.db_path.exists():
+            continue
+        try:
+            with store_db.connect(prof.db_path) as conn:
+                runs = conn.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0) FROM scoring_runs"
+                ).fetchone()[0]
+                tailors = conn.execute(
+                    "SELECT COALESCE(SUM(cost_usd), 0) FROM tailor_outputs"
+                ).fetchone()[0]
+        except sqlite3.Error:
+            # A present-but-unreadable database (e.g. missing schema) must not
+            # blank the page for everyone else - skip just this profile.
+            continue
+        totals.append((prof, float(runs) + float(tailors)))
+    return totals
+
+
 @router.get("/costs", response_class=HTMLResponse)
-def costs(request: Request) -> HTMLResponse:
-    ctx = {"request": request, **_aggregate(paths.db_path())}
+def costs(request: Request, profile: Profile = Depends(profile_dep)) -> HTMLResponse:
+    combined = combined_totals()
+    combined_sum = sum(total for _prof, total in combined)
+    ctx = page_context(
+        request,
+        profile,
+        combined=combined,
+        combined_sum=combined_sum,
+        **_aggregate(profile.db_path),
+    )
     html = _get_env(request).get_template("costs.html").render(**ctx)
     return HTMLResponse(html)

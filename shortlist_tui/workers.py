@@ -194,11 +194,12 @@ def tailor_one(
     cfg: Config,
     prefs: Prefs,
     resume_path: Path,
+    output_root: Path,
     anthropic_client: Any,
 ) -> str:
     orch = TailorOrchestrator(
         db_path=db_path,
-        output_root=cfg.paths.output_dir.expanduser(),
+        output_root=output_root,
         anthropic_client=anthropic_client,
         model=cfg.tailor.model,
         pdf_template=cfg.paths.pdf_template,

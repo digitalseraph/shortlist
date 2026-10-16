@@ -13,6 +13,7 @@ from textual.widgets import Footer, Header, Static
 
 from shortlist import paths
 from shortlist.config import load_config, load_prefs
+from shortlist.profiles import Profile
 
 
 class SettingsScreen(Screen[None]):
@@ -21,6 +22,10 @@ class SettingsScreen(Screen[None]):
         Binding("q", "app.pop_screen", "Back"),
         Binding("e", "edit_externally", "Edit (external)"),
     ]
+
+    def __init__(self, profile: Profile) -> None:
+        super().__init__()
+        self.profile = profile
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -48,9 +53,9 @@ class SettingsScreen(Screen[None]):
             )
 
         try:
-            prefs = load_prefs(paths.prefs_path())
+            prefs = load_prefs(self.profile.prefs_path)
             self.query_one("#prefs-summary", Static).update(
-                f"[bold]Prefs[/bold] — {paths.prefs_path()}\n"
+                f"[bold]Prefs[/bold] — {self.profile.prefs_path}\n"
                 f"  titles: {', '.join(prefs.titles)}\n"
                 f"  locations: {', '.join(prefs.locations)}\n"
                 f"  comp floor: ${prefs.comp_floor_usd:,}\n"
@@ -64,7 +69,7 @@ class SettingsScreen(Screen[None]):
             self.query_one("#prefs-summary", Static).update("[red]prefs.yaml missing[/red]")
 
         self.query_one("#paths-summary", Static).update(
-            f"[bold]Paths[/bold]\n  data: {paths.data_dir()}\n  db: {paths.db_path()}"
+            f"[bold]Paths[/bold]\n  data: {paths.data_dir()}\n  db: {self.profile.db_path}"
         )
 
     def action_edit_externally(self) -> None:

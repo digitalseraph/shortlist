@@ -1,0 +1,13 @@
+{% extends "base_plain.html" %}
+{% block title %}Add a person — Shortlist{% endblock %}
+{% block content %}
+<h1>Add a person</h1>
+<p class="dim">Each person gets their own resume, jobs and board. Your API key and
+budget are shared.</p>
+<form method="post" action="/profiles">
+  <label>Display name <input name="display_name" required placeholder="David"></label>
+  <label>Short name <input name="slug" required placeholder="david"
+         pattern="[a-z0-9-]{1,32}" title="a-z, 0-9 and - only"></label>
+  <button type="submit">Create</button>
+</form>
+{% endblock %}

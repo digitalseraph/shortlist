@@ -1,11 +1,27 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from shortlist.models import RawJob
+from shortlist.profiles import Profile
 from shortlist.store.db import migrate, update_score, upsert_job
 from shortlist_tui.app import ShortlistApp
+
+
+def _profile(db: Path) -> Profile:
+    """Minimal profile pointing at a test database."""
+    return Profile(
+        slug="test",
+        display_name="Test",
+        db_path=db,
+        prefs_path=db.parent / "prefs.yaml",
+        resume_path=db.parent / "resume.md",
+        original_resume_path=db.parent / "resume.original",
+        output_dir=db.parent / "output",
+    )
 
 
 @pytest.mark.asyncio
@@ -27,7 +43,7 @@ async def test_joblist_renders_seeded_jobs(tmp_path: Path) -> None:
     )
     update_score(db, job.id, score=87, reason="x", model="m")
 
-    async with ShortlistApp(db_path=db).run_test() as pilot:
+    async with ShortlistApp(profile=_profile(db)).run_test() as pilot:
         await pilot.pause()
         from textual.widgets import DataTable
 
@@ -44,7 +60,7 @@ async def test_joblist_renders_seeded_jobs(tmp_path: Path) -> None:
 async def test_joblist_quits_on_q(tmp_path: Path) -> None:
     db = tmp_path / "db.sqlite"
     migrate(db)
-    async with ShortlistApp(db_path=db).run_test() as pilot:
+    async with ShortlistApp(profile=_profile(db)).run_test() as pilot:
         await pilot.press("q")
         assert pilot.app.is_running is False or pilot.app.return_value is None
 
@@ -71,7 +87,7 @@ async def test_enter_opens_job_detail(tmp_path: Path) -> None:
 
     from textual.widgets import Static
 
-    async with ShortlistApp(db_path=db).run_test() as pilot:
+    async with ShortlistApp(profile=_profile(db)).run_test() as pilot:
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
@@ -115,7 +131,7 @@ async def test_search_filters_table(tmp_path: Path):
 
     from textual.widgets import DataTable
 
-    async with ShortlistApp(db_path=db).run_test() as pilot:
+    async with ShortlistApp(profile=_profile(db)).run_test() as pilot:
         await pilot.pause()
         await pilot.press("slash")
         await pilot.pause()
