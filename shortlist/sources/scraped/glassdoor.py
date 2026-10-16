@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup, Tag
 from pydantic import HttpUrl
 
 from shortlist.models import RawJob
-from shortlist.sources._browser import headless_context
+from shortlist.sources._browser import headless_context, on_bot_check
 from shortlist.sources.base import Source
 
 logger = logging.getLogger(__name__)
@@ -124,6 +124,9 @@ class GlassdoorSource(Source):
                     await page.goto(url, wait_until="domcontentloaded")
                     await page.wait_for_selector('li[data-test="jobListing"]', timeout=15_000)
                 except Exception as e:  # noqa: BLE001
+                    if await on_bot_check(page):
+                        logger.warning("glassdoor: bot check shown; skipping remaining searches")
+                        break
                     logger.warning("glassdoor: load failed: %s", e)
                     continue
                 html = await page.content()

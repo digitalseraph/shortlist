@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup, Tag
 from pydantic import HttpUrl
 
 from shortlist.models import RawJob
-from shortlist.sources._browser import headless_context
+from shortlist.sources._browser import headless_context, on_bot_check
 from shortlist.sources.base import Source
 
 logger = logging.getLogger(__name__)
@@ -129,6 +129,9 @@ class IndeedSource(Source):
                     await page.goto(url, wait_until="domcontentloaded")
                     await page.wait_for_selector(_CARD, timeout=15_000)
                 except Exception as e:  # noqa: BLE001
+                    if await on_bot_check(page):
+                        logger.warning("indeed: bot check shown; skipping remaining searches")
+                        break
                     logger.warning("indeed: page load failed for %r: %s", q, e)
                     continue
                 html = await page.content()

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from contextlib import suppress
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import httpx
@@ -40,6 +40,8 @@ def parse_job(item: dict[str, Any]) -> RawJob | None:
     except KeyError:
         return None
     posted = datetime.fromisoformat(published.replace("Z", "+00:00"))
+    if posted.tzinfo is None:  # Remotive now omits the offset; its dates are UTC
+        posted = posted.replace(tzinfo=UTC)
     comp_min, comp_max = _parse_salary(item.get("salary"))
     return RawJob(
         source="remotive",

@@ -19,7 +19,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from playwright.async_api import BrowserContext, async_playwright
+from playwright.async_api import BrowserContext, Page, async_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +78,13 @@ async def headless_context(
         finally:
             await context.close()
             await browser.close()
+
+
+async def on_bot_check(page: Page) -> bool:
+    """True when the page is Cloudflare's "Just a moment..." bot check.
+
+    Sources call this after a search fails to load and stop their remaining
+    searches: once a site starts challenging, every later request in the run
+    is challenged too, and each one would otherwise wait out a full timeout.
+    """
+    return (await page.title()).strip().lower().startswith("just a moment")
