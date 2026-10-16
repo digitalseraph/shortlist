@@ -87,8 +87,16 @@ def profile_create(
     name: str = typer.Option(..., "--name", help="Display name, e.g. 'David'"),
 ) -> None:
     """Create a profile with an empty database."""
+    # A whitespace-only name would still pass `--name` and then store unequal
+    # to its own `.strip()`-ed delete confirmation, permanently undeletable.
+    # Same guard as the web route's create_profile; reject before create()
+    # writes anything.
+    display_name = name.strip()
+    if not display_name:
+        typer.echo("display name cannot be blank", err=True)
+        raise typer.Exit(1)
     try:
-        prof = profiles.create(slug, name)
+        prof = profiles.create(slug, display_name)
     except profiles.ProfileError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
@@ -594,11 +602,14 @@ def sources_status(
 
 
 @app.command("tui")
-def tui_cmd() -> None:
+def tui_cmd(
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Which person."),
+) -> None:
     """Launch the Textual TUI."""
     from shortlist_tui import run_tui
 
-    run_tui()
+    prof = _resolve(profile)
+    run_tui(prof)
 
 
 @app.command("web")

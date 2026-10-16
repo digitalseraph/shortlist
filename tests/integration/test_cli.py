@@ -445,6 +445,22 @@ def test_cli_tui_help_does_not_error(env):
     result = runner.invoke(app, ["tui", "--help"])
     assert result.exit_code == 0
     assert "TUI" in result.output or "tui" in result.output.lower()
+    # The TUI has no in-app profile switcher, so --profile is its only way
+    # to pick a person; every other data command has it too.
+    assert "--profile" in result.output
+
+
+def test_cli_tui_exits_cleanly_with_no_profiles(tmp_path, monkeypatch):
+    """No profiles yet must exit with a message, not a traceback from __init__."""
+    monkeypatch.setenv("SHORTLIST_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("SHORTLIST_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.delenv("SHORTLIST_PROFILE", raising=False)
+    result = runner.invoke(app, ["tui"])
+    assert result.exit_code == 1
+    # A clean `_resolve` exit prints just the message and raises typer.Exit,
+    # not an uncaught ProfileNotFoundError traceback.
+    assert "no profiles yet" in result.output
+    assert "Traceback" not in result.output
 
 
 def test_fetch_skips_source_in_cooldown(env, monkeypatch):

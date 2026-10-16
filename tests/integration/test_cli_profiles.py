@@ -36,6 +36,12 @@ def test_profile_create_rejects_bad_slug(env: Path) -> None:
     assert profiles.list_profiles() == []
 
 
+def test_profile_create_rejects_blank_name(env: Path) -> None:
+    result = runner.invoke(app, ["profile", "create", "david", "--name", "   "])
+    assert result.exit_code != 0
+    assert profiles.list_profiles() == []
+
+
 def test_profile_delete_removes_it(env: Path) -> None:
     runner.invoke(app, ["profile", "create", "david", "--name", "David"])
     deleted = runner.invoke(app, ["profile", "delete", "david", "--yes"])
