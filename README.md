@@ -15,6 +15,7 @@ manually** — Shortlist surfaces and prepares; it never auto-submits.
 | 4 | Textual TUI — job list, detail, applications board, settings |
 | 5 | Scraped aggregators (Indeed, LinkedIn, Glassdoor) via Playwright; 24 h auto-cooldown |
 | 6 | Curated boards (HN, RemoteOK), Wellfound, Otta, generic RSS; tag-driven GitHub Release |
+| 7 | Multi-person profiles - `shortlist profile`, `--profile`, `/p/<slug>/` web UI, combined costs |
 
 ---
 
@@ -33,9 +34,9 @@ playwright install chromium  # only needed for scraped sources
 One-time setup, then a golden-path session:
 
 ```bash
-shortlist db init                              # create ~/.local/share/shortlist/db.sqlite
-shortlist config init                          # write config + prefs defaults to ~/.config/shortlist/
-$EDITOR ~/.config/shortlist/prefs.yaml         # add company lists, job title prefs, location
+shortlist config init                          # write shared config.yaml to ~/.config/shortlist/
+shortlist profile create david --name "David"  # create your profile (also runs db init)
+$EDITOR ~/.config/shortlist/profiles/david/prefs.yaml   # company lists, job title prefs, location
 
 shortlist fetch                                # pull jobs from all enabled sources
 shortlist rank --no-llm                        # cheap pass: hard filter + cosine similarity
@@ -61,14 +62,21 @@ shortlist web --port 9000            # custom port
 shortlist web --host 0.0.0.0         # expose on LAN (single-user only — no auth)
 ```
 
-Pages mirror the TUI:
+Every page is scoped to a person at `/p/<slug>/...`, with a header dropdown to switch and an
+"add a new person" link alongside it. Pages mirror the TUI:
 
 | Page | URL | What it shows |
 |------|-----|---------------|
-| Jobs | `/` | Scored job table with live search filter and per-row Tailor button |
-| Job detail | `/job/{id}` | Full JD, tailored resume/cover/notes previews, status tracker |
-| Applications | `/applications` | Kanban columns by status (tailored → offer / rejected) |
-| Settings | `/settings` | Read-only view of config.yaml, prefs.yaml, and data paths |
+| Jobs | `/p/<slug>/` | Scored job table with live search filter and per-row Tailor button |
+| Job detail | `/p/<slug>/job/{id}` | Full JD, tailored resume/cover/notes previews, status tracker |
+| Applications | `/p/<slug>/applications` | Kanban columns by status (tailored → offer / rejected) |
+| Costs | `/p/<slug>/costs` | This person's spend, plus the combined total across everyone |
+| Settings | `/p/<slug>/settings` | Read-only view of config.yaml, prefs.yaml, and data paths |
+
+Old pre-multi-person bookmarks (`/`, `/job/{id}`, `/applications`, `/costs`, `/settings`) still
+work - they redirect to the active profile's version. See
+[docs/usage.md](docs/usage.md#multiple-people) for `profile create`/`list`/`delete` and
+`--profile`.
 
 Global **Fetch** and **Rank** buttons in the header dispatch background tasks and report
 results in a polling status strip at the top of every page. The `shortlist web` command
@@ -136,7 +144,7 @@ RUN_LIVE=1 pytest -m live                       # opt-in: network smoke tests
 RUN_LIVE=1 pytest -m "browser and live"         # opt-in: live scrape smoke
 ```
 
-Coverage target: 80%. Current: 82.96%.
+Coverage target: 80%. Current: 82%.
 
 ## License
 

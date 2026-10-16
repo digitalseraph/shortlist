@@ -88,6 +88,59 @@ These constraints are enforced by import discipline and mypy strict mode:
 
 ---
 
+## Profiles and directory layout
+
+Shortlist supports more than one person per installation. A profile straddles the same two
+roots everything else uses - config is settings, data is state - under a `profiles/<slug>/`
+subtree in each:
+
+```
+~/.config/shortlist/
+  config.yaml                 # shared: Anthropic key, model names, budget
+  pdf-template.tex            # shared: tailor PDF template
+  state.yaml                  # which profile slug was used last
+  profiles/
+    david/
+      prefs.yaml               # per-profile: source queries, filters
+    alex/
+      prefs.yaml
+
+~/.local/share/shortlist/
+  profiles/
+    david/
+      profile.yaml              # display name
+      db.sqlite                 # jobs, scores, applications, cost history
+      resume.md                 # extracted resume text used for ranking/tailoring
+      resume.original           # the uploaded file as received (pdf/docx/md)
+      output/                   # tailored resume/cover/notes per job
+    alex/
+      profile.yaml
+      db.sqlite
+      resume.md
+      resume.original
+      output/
+```
+
+There is no separate registry file - the directory listing under `data_dir/profiles/` *is*
+the registry, and `profile.yaml` existing there is what makes a slug "a profile" to `load()`
+and `list_profiles()`. `profiles.create()` builds both trees, seeds `prefs.yaml`, and runs a
+fresh `migrate()` against the new `db.sqlite`; `profiles.delete()` removes both trees -
+including the database and its cost history - with no undo.
+
+`profiles.resolve()` is the single place that picks "which person": explicit argument →
+`SHORTLIST_PROFILE` env var → the only profile if there is exactly one → `state.yaml`'s
+last-used slug → otherwise it raises, listing the available slugs rather than guessing. Every
+CLI data command and the TUI's `__init__` call through it (via `cli._resolve`, which turns the
+exception into a clean exit).
+
+The web layer scopes every page under `/p/{slug}/...`, resolved per request by a FastAPI
+dependency (`profile_dep`) that 404s on an unknown or malformed slug rather than falling back
+to someone else's data. A handful of pre-multi-person bare paths (`/`, `/applications`,
+`/costs`, `/settings`, `/resume`) still resolve via middleware to the active profile's
+`/p/{slug}/...` equivalent, so old bookmarks keep working.
+
+---
+
 ## Module index
 
 ### `shortlist/`
@@ -97,7 +150,9 @@ These constraints are enforced by import discipline and mypy strict mode:
 | `cli.py` | Typer app and all CLI subcommands |
 | `config.py` | Pydantic models for `config.yaml` and `prefs.yaml`; `load_config`, `load_prefs` |
 | `models.py` | `RawJob`, `Job`, `Application`, `Contact`, `JobStatus` Literal |
-| `paths.py` | XDG-compliant paths — `db_path()`, `config_path()`, `prefs_path()`, `data_dir()` |
+| `paths.py` | XDG-compliant roots — `config_dir()`, `data_dir()`, `config_path()` |
+| `profiles.py` | `Profile` dataclass; `create`/`load`/`list_profiles`/`delete`/`resolve` |
+| `state.py` | Cross-run state outside config — which profile slug was last used |
 
 ### `shortlist/store/`
 
@@ -246,9 +301,9 @@ All timestamp columns store ISO-8601 UTC strings (e.g., `2026-04-28T13:45:00Z`).
 | Browser | `browser` | 5 | Playwright smoke against real sites (deselected from default run) |
 | Live network | `live` | 5 | Real ATS API calls, gated by `RUN_LIVE=1` env var |
 
-Default CI command: `pytest -m "not browser and not live"` → 159 passed, 1 skipped.
+Default CI command: `pytest -m "not browser and not live"` → 292 passed, 1 skipped.
 
-Coverage: 82.96% total. Minimum required: 80%.
+Coverage: 82% total. Minimum required: 80%.
 
 ---
 
