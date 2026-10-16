@@ -59,11 +59,16 @@ def create_app() -> FastAPI:
         return RedirectResponse(target, status_code=307)
 
     # profiles.router is unprefixed: it exists precisely for when there is no
-    # active profile. settings.router converts to the prefix in its own task
-    # too.
+    # active profile.
     app.include_router(profiles_router.router)
-    app.include_router(settings.router)
-    for router in (jobs.router, applications.router, costs.router, actions.router, resume.router):
+    for router in (
+        jobs.router,
+        applications.router,
+        costs.router,
+        actions.router,
+        resume.router,
+        settings.router,
+    ):
         app.include_router(router, prefix="/p/{slug}")
 
     return app

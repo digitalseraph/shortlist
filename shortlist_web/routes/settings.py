@@ -1,68 +1,123 @@
-"""Settings read-only view — mirrors TUI SettingsScreen."""
+"""Settings: one shared config.yaml editor, plus one prefs.yaml editor per person.
+
+Both forms validate through the existing pydantic models before writing
+anything. ``config.yaml`` is what the application boots from, so a broken
+file saved here could lock someone out of the very screen they'd use to fix
+it — validate-before-write is what keeps that from happening.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+import yaml
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
-from jinja2 import Environment, FileSystemLoader
 
 from shortlist import paths
-from shortlist.config import load_config, load_prefs
+from shortlist.config import DEFAULT_CONFIG_YAML, Config, Prefs
+from shortlist.profiles import Profile
+from shortlist_web.routes._shared import get_env, page_context, profile_dep
 
 router = APIRouter()
 
 
-def _get_env(request: Request) -> Environment:
-    templates_dir: Path = request.app.state.templates_dir
-    return Environment(loader=FileSystemLoader(str(templates_dir)), autoescape=True)
+def _read(path: Path, default: str = "") -> str:
+    return path.read_text() if path.exists() else default
+
+
+def _render_settings(
+    request: Request,
+    profile: Profile,
+    *,
+    note: str = "",
+    error: str = "",
+    text: str | None = None,
+    code: int = 200,
+) -> HTMLResponse:
+    """Render settings.html through page_context.
+
+    When `error` is set, re-render the submitted `text` instead of what's on
+    disk — in whichever editor this request posted to, so nothing the person
+    typed is lost. Which editor that is comes from the request path itself
+    (config and prefs post to different routes), not an extra parameter. When
+    `text` is None (the GET view, or a successful save), both editors load
+    fresh from disk.
+    """
+    editing_config = text is not None and request.url.path.endswith("/settings/config")
+    config_text = text if editing_config else _read(paths.config_path(), DEFAULT_CONFIG_YAML)
+    prefs_text = text if (text is not None and not editing_config) else _read(profile.prefs_path)
+    html = (
+        get_env(request)
+        .get_template("settings.html")
+        .render(
+            **page_context(
+                request,
+                profile,
+                config_path=str(paths.config_path()),
+                prefs_path=str(profile.prefs_path),
+                config_text=config_text,
+                prefs_text=prefs_text,
+                config_error=error if editing_config else "",
+                prefs_error=error if (error and not editing_config) else "",
+                note=note,
+            )
+        )
+    )
+    return HTMLResponse(html, status_code=code)
 
 
 @router.get("/settings", response_class=HTMLResponse)
-def settings_view(request: Request) -> HTMLResponse:
-    config_summary: str | None = None
-    prefs_summary: str | None = None
-    config_error: str | None = None
-    prefs_error: str | None = None
+def settings_view(request: Request, profile: Profile = Depends(profile_dep)) -> HTMLResponse:
+    return _render_settings(request, profile)
 
+
+def _save_yaml(
+    request: Request,
+    profile: Profile,
+    path: Path,
+    text: str,
+    parse: Callable[[str], object],
+) -> HTMLResponse:
+    """Validate `text`, then write it verbatim so comments and ordering survive."""
     try:
-        cfg = load_config(paths.config_path())
-        enabled = [k for k, v in cfg.sources.items() if v.enabled]
-        config_summary = (
-            f"budget daily ${cfg.budget.daily_usd:.2f} / monthly ${cfg.budget.monthly_usd:.2f} | "
-            f"rerank: {cfg.ranker.rerank_model} | tailor: {cfg.tailor.model} | "
-            f"sources: {', '.join(enabled) or 'none'}"
-        )
-    except FileNotFoundError:
-        config_error = "config.yaml missing — run `shortlist config init`"
+        parse(text)
+    except Exception as exc:  # noqa: BLE001 — yaml and pydantic raise unrelated types
+        return _render_settings(request, profile, error=str(exc), text=text, code=400)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        backup = path.with_name(path.name + ".bak")
+        backup.write_text(path.read_text())
+    path.write_text(text)
+    return _render_settings(request, profile, note="Saved.")
 
-    try:
-        prefs = load_prefs(paths.prefs_path())
-        prefs_summary = (
-            f"titles: {', '.join(prefs.titles)} | "
-            f"locations: {', '.join(prefs.locations)} | "
-            f"comp floor: ${prefs.comp_floor_usd:,} | "
-            f"greenhouse: {len(prefs.greenhouse_companies)} | "
-            f"lever: {len(prefs.lever_companies)} | "
-            f"ashby: {len(prefs.ashby_companies)}"
-        )
-    except FileNotFoundError:
-        prefs_error = "prefs.yaml missing — run `shortlist config init`"
 
-    html = (
-        _get_env(request)
-        .get_template("settings.html")
-        .render(
-            request=request,
-            config_path=str(paths.config_path()),
-            prefs_path=str(paths.prefs_path()),
-            config_summary=config_summary,
-            config_error=config_error,
-            prefs_summary=prefs_summary,
-            prefs_error=prefs_error,
-            data_dir=str(paths.data_dir()),
-            db_path=str(paths.db_path()),
-        )
+@router.post("/settings/prefs", response_class=HTMLResponse)
+def save_prefs(
+    request: Request,
+    profile: Profile = Depends(profile_dep),
+    text: str = Form(...),
+) -> HTMLResponse:
+    return _save_yaml(
+        request,
+        profile,
+        profile.prefs_path,
+        text,
+        lambda s: Prefs(**(yaml.safe_load(s) or {})),
     )
-    return HTMLResponse(html)
+
+
+@router.post("/settings/config", response_class=HTMLResponse)
+def save_config(
+    request: Request,
+    profile: Profile = Depends(profile_dep),
+    text: str = Form(...),
+) -> HTMLResponse:
+    return _save_yaml(
+        request,
+        profile,
+        paths.config_path(),
+        text,
+        lambda s: Config(**(yaml.safe_load(s) or {})),
+    )

@@ -2,32 +2,25 @@
 {% block title %}Settings — Shortlist{% endblock %}
 {% block content %}
 <h1>Settings</h1>
+{% if note %}<p class="dim">{{ note }}</p>{% endif %}
 
 <section class="settings-section">
   <h2>Config <span class="dim">{{ config_path }}</span></h2>
-  {% if config_error %}
-  <p class="error">{{ config_error }}</p>
-  {% else %}
-  <p>{{ config_summary }}</p>
-  {% endif %}
+  <p class="dim small">Shared across every profile.</p>
+  {% if config_error %}<p class="error">{{ config_error }}</p>{% endif %}
+  <form method="post" action="/p/{{ active.slug }}/settings/config">
+    <textarea name="text" rows="24" cols="100" spellcheck="false">{{ config_text }}</textarea>
+    <div><button type="submit">Save config</button></div>
+  </form>
 </section>
 
 <section class="settings-section">
   <h2>Prefs <span class="dim">{{ prefs_path }}</span></h2>
-  {% if prefs_error %}
-  <p class="error">{{ prefs_error }}</p>
-  {% else %}
-  <p>{{ prefs_summary }}</p>
-  {% endif %}
-</section>
-
-<section class="settings-section">
-  <h2>Paths</h2>
-  <dl>
-    <dt>data dir</dt><dd>{{ data_dir }}</dd>
-    <dt>db</dt><dd>{{ db_path }}</dd>
-    <dt>config</dt><dd>{{ config_path }}</dd>
-    <dt>prefs</dt><dd>{{ prefs_path }}</dd>
-  </dl>
+  <p class="dim small">Just for {{ active.display_name }}.</p>
+  {% if prefs_error %}<p class="error">{{ prefs_error }}</p>{% endif %}
+  <form method="post" action="/p/{{ active.slug }}/settings/prefs">
+    <textarea name="text" rows="24" cols="100" spellcheck="false">{{ prefs_text }}</textarea>
+    <div><button type="submit">Save prefs</button></div>
+  </form>
 </section>
 {% endblock %}
