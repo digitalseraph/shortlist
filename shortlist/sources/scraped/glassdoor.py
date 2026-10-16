@@ -94,11 +94,23 @@ class GlassdoorSource(Source):
     name: ClassVar[str] = "glassdoor"
 
     def __init__(
-        self, *, queries: list[str], location: str = "Remote", rate_limit_seconds: float = 10.0
+        self,
+        *,
+        queries: list[str],
+        locations: list[str] | None = None,
+        rate_limit_seconds: float = 10.0,
     ):
         self._queries = queries
-        self._location = location
+        self._locations = locations or ["Remote"]
         self._rate = rate_limit_seconds
+
+    def search_urls(self) -> list[str]:
+        """One URL for every query in every location."""
+        return [
+            f"{_BASE}?{urlencode({'sc.keyword': q, 'locKeyword': loc})}"
+            for q in self._queries
+            for loc in self._locations
+        ]
 
     def fetch(self, since: datetime | None) -> Iterator[RawJob]:  # noqa: ARG002
         return iter(asyncio.run(self._fetch_all()))
@@ -107,9 +119,7 @@ class GlassdoorSource(Source):
         out: list[RawJob] = []
         async with headless_context() as ctx:
             page = await ctx.new_page()
-            for q in self._queries:
-                params = {"sc.keyword": q, "locKeyword": self._location}
-                url = f"{_BASE}?{urlencode(params)}"
+            for url in self.search_urls():
                 logger.info("glassdoor: fetching %s", url)
                 try:
                     await page.goto(url, wait_until="domcontentloaded")

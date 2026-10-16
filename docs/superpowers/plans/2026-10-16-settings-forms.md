@@ -238,20 +238,21 @@ def test_unknown_search_location_is_named_in_the_error() -> None:
 - [ ] **Step 3: Implement** in `Prefs`, after `rss_urls`:
 
 ```python
-    search_locations: list[str] = Field(default_factory=list)
+search_locations: list[str] = Field(default_factory=list)
 
-    @field_validator("search_locations")
-    @classmethod
-    def _known_places(cls, v: list[str]) -> list[str]:
-        out: list[str] = []
-        for raw in v:
-            if not raw.strip():
-                continue
-            name = places.canonical(raw)
-            if name is None:
-                raise ValueError(f"not a known place: {raw.strip()!r}")
-            out.append(name)
-        return out
+
+@field_validator("search_locations")
+@classmethod
+def _known_places(cls, v: list[str]) -> list[str]:
+    out: list[str] = []
+    for raw in v:
+        if not raw.strip():
+            continue
+        name = places.canonical(raw)
+        if name is None:
+            raise ValueError(f"not a known place: {raw.strip()!r}")
+        out.append(name)
+    return out
 ```
 
 Add `from shortlist import places` to the imports.
@@ -344,24 +345,25 @@ def test_linkedin_defaults_to_united_states_without_remote_filter() -> None:
 - [ ] **Step 3: Indeed**
 
 ```python
-    def __init__(
-        self,
-        *,
-        queries: list[str],
-        locations: list[str] | None = None,
-        rate_limit_seconds: float = 8.0,
-    ):
-        self._queries = queries
-        self._locations = locations or ["Remote"]
-        self._rate = rate_limit_seconds
+def __init__(
+    self,
+    *,
+    queries: list[str],
+    locations: list[str] | None = None,
+    rate_limit_seconds: float = 8.0,
+):
+    self._queries = queries
+    self._locations = locations or ["Remote"]
+    self._rate = rate_limit_seconds
 
-    def search_urls(self) -> list[tuple[str, str]]:
-        """(query, url) for every query in every location."""
-        return [
-            (q, f"{_BASE}?{urlencode({'q': q, 'l': loc})}")
-            for q in self._queries
-            for loc in self._locations
-        ]
+
+def search_urls(self) -> list[tuple[str, str]]:
+    """(query, url) for every query in every location."""
+    return [
+        (q, f"{_BASE}?{urlencode({'q': q, 'l': loc})}")
+        for q in self._queries
+        for loc in self._locations
+    ]
 ```
 
 In `_fetch_all` replace `for q in self._queries:` and the `url = ...` line with `for q, url in self.search_urls():`.
@@ -369,24 +371,25 @@ In `_fetch_all` replace `for q in self._queries:` and the `url = ...` line with 
 - [ ] **Step 4: Glassdoor**
 
 ```python
-    def __init__(
-        self,
-        *,
-        queries: list[str],
-        locations: list[str] | None = None,
-        rate_limit_seconds: float = 10.0,
-    ):
-        self._queries = queries
-        self._locations = locations or ["Remote"]
-        self._rate = rate_limit_seconds
+def __init__(
+    self,
+    *,
+    queries: list[str],
+    locations: list[str] | None = None,
+    rate_limit_seconds: float = 10.0,
+):
+    self._queries = queries
+    self._locations = locations or ["Remote"]
+    self._rate = rate_limit_seconds
 
-    def search_urls(self) -> list[str]:
-        """One URL for every query in every location."""
-        return [
-            f"{_BASE}?{urlencode({'sc.keyword': q, 'locKeyword': loc})}"
-            for q in self._queries
-            for loc in self._locations
-        ]
+
+def search_urls(self) -> list[str]:
+    """One URL for every query in every location."""
+    return [
+        f"{_BASE}?{urlencode({'sc.keyword': q, 'locKeyword': loc})}"
+        for q in self._queries
+        for loc in self._locations
+    ]
 ```
 
 In `_fetch_all`: `for url in self.search_urls():` replacing the query loop, `params` and `url` lines.
@@ -799,9 +802,7 @@ async def save_prefs_form(
         prefs = Prefs.model_validate(data)
     except ValidationError as exc:
         errors = settings_forms.field_errors(exc, settings_forms.PREFS_ERROR_NAMES)
-        return _render_settings(
-            request, profile, prefs_values=data, prefs_errors=errors, code=400
-        )
+        return _render_settings(request, profile, prefs_values=data, prefs_errors=errors, code=400)
     text = settings_forms.to_yaml(settings_forms.PREFS_HEADER, prefs)
     _write_with_backup(profile.prefs_path, text)
     return _render_settings(request, profile, note="Saved.")

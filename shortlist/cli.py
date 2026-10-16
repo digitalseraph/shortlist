@@ -239,11 +239,15 @@ def _build_sources(prefs: Prefs) -> list[Source]:
             SmartRecruitersSource(companies={t: t for t in prefs.smartrecruiters_companies})
         )
     if prefs.indeed_queries:
-        sources.append(IndeedSource(queries=prefs.indeed_queries))
+        sources.append(IndeedSource(queries=prefs.indeed_queries, locations=prefs.search_locations))
     if prefs.linkedin_queries:
-        sources.append(LinkedInSource(queries=prefs.linkedin_queries))
+        sources.append(
+            LinkedInSource(queries=prefs.linkedin_queries, locations=prefs.search_locations)
+        )
     if prefs.glassdoor_queries:
-        sources.append(GlassdoorSource(queries=prefs.glassdoor_queries))
+        sources.append(
+            GlassdoorSource(queries=prefs.glassdoor_queries, locations=prefs.search_locations)
+        )
     if prefs.hn_enabled:
         sources.append(HNWhoHiringSource())
     if prefs.remoteok_enabled:

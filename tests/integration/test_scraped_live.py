@@ -30,7 +30,7 @@ pytestmark = [
 def test_indeed_live_returns_some_results_or_bans():
     src = IndeedSource(
         queries=["senior backend engineer"],
-        location="Remote",
+        locations=["Remote"],
         rate_limit_seconds=2.0,
     )
     try:
@@ -46,7 +46,7 @@ def test_indeed_live_returns_some_results_or_bans():
 def test_linkedin_live_returns_some_results_or_bans():
     src = LinkedInSource(
         queries=["platform engineer"],
-        location="United States",
+        locations=["United States"],
         rate_limit_seconds=4.0,
         max_pages=1,
     )
@@ -62,7 +62,7 @@ def test_linkedin_live_returns_some_results_or_bans():
 def test_glassdoor_live_returns_some_results_or_bans():
     src = GlassdoorSource(
         queries=["staff engineer"],
-        location="Remote",
+        locations=["Remote"],
         rate_limit_seconds=3.0,
     )
     try:
