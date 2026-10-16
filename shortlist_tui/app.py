@@ -55,38 +55,44 @@ class ShortlistApp(App[None]):
 
     @work(thread=True, exclusive=True, group="rank")
     def _rank_worker(self) -> None:
-        cfg = load_config(paths.config_path())
-        prefs = load_prefs(self.profile.prefs_path)
-        resume = cfg.paths.resume.expanduser()
-        key = os.environ.get(cfg.anthropic.key_env_var, "")
-        if not key:
-            self.notify(
-                "ANTHROPIC_API_KEY not set — skipping LLM rerank",
-                severity="warning",
-            )
-            client = None
-        else:
-            from anthropic import Anthropic
+        try:
+            cfg = load_config(paths.config_path())
+            prefs = load_prefs(self.profile.prefs_path)
+            resume = self.profile.resume_path
+            if not resume.exists():
+                self.notify(f"resume not found at {resume}", severity="error", timeout=8)
+                return
+            key = os.environ.get(cfg.anthropic.key_env_var, "")
+            if not key:
+                self.notify(
+                    "ANTHROPIC_API_KEY not set — skipping LLM rerank",
+                    severity="warning",
+                )
+                client = None
+            else:
+                from anthropic import Anthropic
 
-            client = Anthropic(api_key=key)
-        msg = rank_all(
-            self.profile.db_path,
-            cfg=cfg,
-            prefs=prefs,
-            resume_path=resume,
-            anthropic_client=client,
-        )
-        self.notify(msg, severity="information")
-        screen = self.screen_stack[-1]
-        if hasattr(screen, "_reload"):
-            self.call_from_thread(screen._reload)
+                client = Anthropic(api_key=key)
+            msg = rank_all(
+                self.profile.db_path,
+                cfg=cfg,
+                prefs=prefs,
+                resume_path=resume,
+                anthropic_client=client,
+            )
+            self.notify(msg, severity="information")
+            screen = self.screen_stack[-1]
+            if hasattr(screen, "_reload"):
+                self.call_from_thread(screen._reload)
+        except Exception as e:  # noqa: BLE001 — surface in TUI
+            self.notify(f"rank failed: {e}", severity="error", timeout=10)
 
     @work(thread=True, exclusive=True, group="tailor")
     def _tailor_worker(self, job_id: int) -> None:
         try:
             cfg = load_config(paths.config_path())
             prefs = load_prefs(self.profile.prefs_path)
-            resume = cfg.paths.resume.expanduser()
+            resume = self.profile.resume_path
             if not resume.exists():
                 self.notify(f"resume not found at {resume}", severity="error", timeout=8)
                 return
@@ -102,6 +108,7 @@ class ShortlistApp(App[None]):
                 cfg=cfg,
                 prefs=prefs,
                 resume_path=resume,
+                output_root=self.profile.output_dir,
                 anthropic_client=Anthropic(api_key=key),
             )
             self.notify(msg, severity="information")

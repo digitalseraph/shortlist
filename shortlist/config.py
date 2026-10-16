@@ -17,8 +17,6 @@ budget:
   daily_usd: 5.00
   monthly_usd: 60.00
 paths:
-  resume: ~/jobs/resume.md
-  output_dir: ~/jobs
   pdf_template: ~/.config/shortlist/pdf-template.tex
 sources:
   greenhouse:
@@ -98,8 +96,14 @@ class BudgetConfig(BaseModel):
 
 class PathsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    resume: Path
-    output_dir: Path
+    # Legacy and unused: per-person resume/output paths now come from the
+    # active Profile (shortlist.profiles.Profile.resume_path/output_dir).
+    # Kept optional, not deleted, so an existing config.yaml with these keys
+    # still loads.
+    resume: Path | None = None
+    # Legacy and unused: see `resume` above; output now comes from
+    # Profile.output_dir.
+    output_dir: Path | None = None
     pdf_template: Path | None = None
 
 

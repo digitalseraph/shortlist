@@ -10,7 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 
 from shortlist import paths
-from shortlist.config import load_config, load_prefs
+from shortlist.config import Config, load_config, load_prefs
 from shortlist.profiles import Profile
 from shortlist.store import db as store_db
 from shortlist_tui.workers import fetch_all, rank_all, rerank_selected, tailor_one
@@ -106,15 +106,41 @@ def _run_tailor(
     cfg: Any,
     prefs: Any,
     resume: Path,
+    output_root: Path,
     client: Any,
 ) -> None:
     try:
         result = tailor_one(
-            db_path, job_id, cfg=cfg, prefs=prefs, resume_path=resume, anthropic_client=client
+            db_path,
+            job_id,
+            cfg=cfg,
+            prefs=prefs,
+            resume_path=resume,
+            output_root=output_root,
+            anthropic_client=client,
         )
         _append_log(app, slug, f"tailor {job_id}: {result}")
     except Exception as exc:  # noqa: BLE001
         _append_log(app, slug, f"tailor {job_id} error: {exc}")
+
+
+def _config_or_toast(request: Request) -> Config | HTMLResponse:
+    """Load the shared config.yaml, or a 400 toast naming how to create it.
+
+    A fresh install created entirely through the web UI has no config.yaml
+    yet; `load_config` would raise FileNotFoundError and surface as a bare
+    500. The CLI guards this same gap with "run `shortlist config init`
+    first" (cli.py) — this is the web equivalent.
+    """
+    cfg_path = paths.config_path()
+    if not cfg_path.exists():
+        return toast(
+            request,
+            f"{cfg_path} not found — create it from Settings, or run `shortlist config init`",
+            "error",
+            code=400,
+        )
+    return load_config(cfg_path)
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +169,9 @@ def rank(
     """Run the ranking pipeline. mode='llm' uses Claude; 'no-llm' is cosine-only."""
     if mode not in ("llm", "no-llm"):
         return toast(request, f"invalid mode: {mode}", "error", code=400)
-    cfg = load_config(paths.config_path())
+    cfg = _config_or_toast(request)
+    if isinstance(cfg, HTMLResponse):
+        return cfg
     prefs = load_prefs(profile.prefs_path)
     resume = profile.resume_path
     if not resume.exists():
@@ -173,7 +201,9 @@ def rank_selected(
     """LLM-rerank the user's checkbox selection from the job list."""
     if not job_ids:
         return toast(request, "no jobs selected", "error", code=400)
-    cfg = load_config(paths.config_path())
+    cfg = _config_or_toast(request)
+    if isinstance(cfg, HTMLResponse):
+        return cfg
     prefs = load_prefs(profile.prefs_path)
     resume = profile.resume_path
     if not resume.exists():
@@ -204,7 +234,9 @@ def tailor(
     request: Request,
     profile: Profile = Depends(profile_dep),
 ) -> HTMLResponse:
-    cfg = load_config(paths.config_path())
+    cfg = _config_or_toast(request)
+    if isinstance(cfg, HTMLResponse):
+        return cfg
     prefs = load_prefs(profile.prefs_path)
     resume = profile.resume_path
     if not resume.exists():
@@ -223,6 +255,7 @@ def tailor(
         cfg,
         prefs,
         resume,
+        profile.output_dir,
         Anthropic(api_key=key),
     )
     return toast(request, f"tailoring job {job_id}…", "info")

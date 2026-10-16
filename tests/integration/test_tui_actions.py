@@ -48,3 +48,63 @@ async def test_f_triggers_fetch(tmp_path: Path, monkeypatch):
         await pilot.press("f")
         await pilot.app.workers.wait_for_complete()
     assert called == [True]
+
+
+@pytest.mark.asyncio
+async def test_rank_worker_uses_the_profiles_own_resume(tmp_path: Path, monkeypatch):
+    """Rank must score a profile's jobs against THAT profile's own resume,
+    never the shared config.yaml's legacy `paths.resume` — otherwise another
+    person's jobs get scored against the owner's career history.
+    """
+    db = tmp_path / "db.sqlite"
+    migrate(db)
+    cfg_dir = tmp_path / "cfg"
+    cfg_dir.mkdir()
+    monkeypatch.setenv("SHORTLIST_CONFIG_HOME", str(cfg_dir))
+    monkeypatch.setenv("SHORTLIST_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    decoy_resume = tmp_path / "decoy-shared-resume.md"
+    decoy_resume.write_text("someone else's resume")
+    (cfg_dir / "config.yaml").write_text(
+        "anthropic:\n"
+        "  key_source: env\n"
+        "  key_env_var: ANTHROPIC_API_KEY\n"
+        "budget:\n"
+        "  daily_usd: 5.0\n"
+        "  monthly_usd: 60.0\n"
+        "paths:\n"
+        f"  resume: {decoy_resume}\n"
+        f"  output_dir: {tmp_path / 'decoy-output'}\n"
+        "sources: {}\n"
+        "ranker:\n"
+        "  top_k_for_llm_rerank: 30\n"
+        "  embedding_model: bge-small-en-v1.5\n"
+        "  rerank_model: claude-haiku-4-5-20251001\n"
+        "tailor:\n"
+        "  model: claude-sonnet-4-6\n"
+        "  cover_paragraphs: 3\n"
+    )
+
+    profile = _profile(db)
+    profile.resume_path.parent.mkdir(parents=True, exist_ok=True)
+    profile.resume_path.write_text("this profile's own resume")
+
+    captured: dict[str, Path] = {}
+
+    def fake_rank_all(db_path, **kwargs):
+        captured["resume_path"] = kwargs["resume_path"]
+        return "ranked"
+
+    import shortlist_tui.app as app_mod
+
+    monkeypatch.setattr(app_mod, "rank_all", fake_rank_all)
+    monkeypatch.setattr(app_mod, "load_prefs", lambda *_a, **_k: MagicMock())
+
+    async with ShortlistApp(profile=profile).run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("R")
+        await pilot.app.workers.wait_for_complete()
+
+    assert captured["resume_path"] == profile.resume_path
+    assert captured["resume_path"] != decoy_resume

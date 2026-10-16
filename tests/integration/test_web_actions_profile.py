@@ -4,13 +4,32 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from shortlist import profiles
+from shortlist.models import RawJob
 from shortlist.store import db as store_db
 from shortlist_web.app import create_app
+
+FIXTURES = Path(__file__).parent.parent / "fixtures"
+
+
+def _seed(db: Path, eid: str, company: str) -> int:
+    job = store_db.upsert_job(
+        db,
+        RawJob(
+            source="greenhouse",
+            external_id=eid,
+            company=company,
+            title="Senior Backend Engineer",
+            url=f"https://example.com/{eid}",
+            posted_at=datetime.now(UTC),
+        ),
+    )
+    return job.id
 
 
 @pytest.fixture
@@ -74,3 +93,59 @@ def test_fetch_writes_to_the_url_profile_not_the_env_active_one(
     assert store_db.source_last_fetched(david.db_path, "fake") is not None
     assert store_db.source_last_fetched(alex.db_path, "fake") is None
     assert client.app.state.task_log[-1][0] == "david"
+
+
+def test_tailor_writes_under_the_profiles_own_output_dir(
+    client: TestClient, env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A tailor run enqueued through the web must land under THAT profile's
+    own output_dir. The shared config.yaml's `paths.output_dir` is legacy and
+    unused — jobs are {company}-{title}-{job.id}, and job ids autoincrement
+    per database, so two people who fetched the same posting would otherwise
+    collide on the exact same path in a shared directory.
+    """
+    david = profiles.create("david", "David")
+    jid = _seed(david.db_path, "gh_1", "Acme")
+    david.resume_path.parent.mkdir(parents=True, exist_ok=True)
+    david.resume_path.write_text("# David's resume\n")
+
+    decoy_output = env / "decoy-shared-output"
+    cfg_path = env / "config" / "config.yaml"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(
+        "anthropic:\n"
+        "  key_source: env\n"
+        "  key_env_var: ANTHROPIC_API_KEY\n"
+        "budget:\n"
+        "  daily_usd: 5.0\n"
+        "  monthly_usd: 60.0\n"
+        "paths:\n"
+        f"  resume: {david.resume_path}\n"
+        f"  output_dir: {decoy_output}\n"
+        "sources: {}\n"
+        "ranker:\n"
+        "  top_k_for_llm_rerank: 30\n"
+        "  embedding_model: bge-small-en-v1.5\n"
+        "  rerank_model: claude-haiku-4-5-20251001\n"
+        "tailor:\n"
+        "  model: claude-sonnet-4-6\n"
+        "  cover_paragraphs: 3\n"
+    )
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+
+    fixture = FIXTURES / "llm_responses/sonnet_tailor_sample.md"
+    msg = MagicMock()
+    msg.content = [MagicMock(text=fixture.read_text())]
+    msg.usage.input_tokens = 1500
+    msg.usage.output_tokens = 1200
+    fake_anth = MagicMock()
+    fake_anth.messages.create.return_value = msg
+    # actions.py imports Anthropic lazily inside the route, so patch the SDK's
+    # own symbol rather than a (nonexistent) module-level one in actions.py.
+    monkeypatch.setattr("anthropic.Anthropic", lambda **_kw: fake_anth)
+
+    r = client.post(f"/p/david/tailor/{jid}")
+    assert r.status_code == 200
+
+    assert any(david.output_dir.iterdir()), "nothing was written under the profile's output_dir"
+    assert not decoy_output.exists(), "the shared/legacy cfg.paths.output_dir must never be used"
