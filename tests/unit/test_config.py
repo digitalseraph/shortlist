@@ -97,3 +97,29 @@ def test_prefs_includes_scraped_queries():
     assert p.indeed_queries == []
     assert p.linkedin_queries == []
     assert p.glassdoor_queries == []
+
+
+def _prefs_data(**overrides: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "titles": ["French Teacher"],
+        "locations": [],
+        "remote_ok": True,
+        "comp_floor_usd": 0,
+        "exclude_keywords": [],
+        "seniority": [],
+    }
+    return base | overrides
+
+
+def test_search_locations_default_empty() -> None:
+    assert Prefs.model_validate(_prefs_data()).search_locations == []
+
+
+def test_search_locations_are_canonicalised() -> None:
+    prefs = Prefs.model_validate(_prefs_data(search_locations=["brunswick, ga", "REMOTE", " "]))
+    assert prefs.search_locations == ["Brunswick, GA", "Remote"]
+
+
+def test_unknown_search_location_is_named_in_the_error() -> None:
+    with pytest.raises(ValidationError, match="not a known place: 'Brunswik, GA'"):
+        Prefs.model_validate(_prefs_data(search_locations=["Brunswik, GA"]))

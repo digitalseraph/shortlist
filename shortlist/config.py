@@ -8,6 +8,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from shortlist import places
+
 DEFAULT_CONFIG_YAML = """\
 # Shortlist configuration. See docs/spec.md for the full reference.
 anthropic:
@@ -159,6 +161,22 @@ class Prefs(BaseModel):
     wellfound_queries: list[str] = Field(default_factory=list)
     otta_queries: list[str] = Field(default_factory=list)
     rss_urls: list[str] = Field(default_factory=list)
+    # Where Indeed, LinkedIn and Glassdoor search. Unlike `locations` (a
+    # substring filter on fetched jobs), each entry must be a known place.
+    search_locations: list[str] = Field(default_factory=list)
+
+    @field_validator("search_locations")
+    @classmethod
+    def _known_places(cls, v: list[str]) -> list[str]:
+        out: list[str] = []
+        for raw in v:
+            if not raw.strip():
+                continue
+            name = places.canonical(raw)
+            if name is None:
+                raise ValueError(f"not a known place: {raw.strip()!r}")
+            out.append(name)
+        return out
 
     @field_validator(
         "titles",
