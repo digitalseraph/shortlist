@@ -1,10 +1,119 @@
 {% extends "base.html" %}
 {% block title %}Settings — Shortlist{% endblock %}
+
+{% macro err(errors, name) %}{% if errors.get(name) %}<span class="error small">{{ errors[name] }}</span>{% endif %}{% endmacro %}
+
+{% macro lines_field(values, errors, name, label, hint="") %}
+<label class="field">
+  <span>{{ label }}</span>
+  <textarea name="{{ name }}" rows="3" spellcheck="false">{{ (values.get(name) or []) | join("\n") }}</textarea>
+  {% if hint %}<span class="dim small">{{ hint }}</span>{% endif %}
+  {{ err(errors, name) }}
+</label>
+{% endmacro %}
+
+{% macro location_field(values, errors, name, label, hint) %}
+<div class="field">
+  <span>{{ label }}</span>
+  <div class="location-list">
+    {% for loc in (values.get(name) or []) + [""] %}
+    <div class="location-row">
+      <input name="{{ name }}" value="{{ loc }}" list="place-options" autocomplete="off">
+      <button type="button" data-remove-location title="Remove">&times;</button>
+    </div>
+    {% endfor %}
+  </div>
+  <button type="button" data-add-location>Add location</button>
+  <span class="dim small">{{ hint }}</span>
+  {{ err(errors, name) }}
+</div>
+{% endmacro %}
+
+{% macro checkbox(values, name, label) %}
+<label class="check"><input type="checkbox" name="{{ name }}" {% if values.get(name) %}checked{% endif %}> {{ label }}</label>
+{% endmacro %}
+
+{% macro text_field(values, errors, name, label) %}
+<label class="field"><span>{{ label }}</span>
+  <input name="{{ name }}" value="{{ values.get(name) if values.get(name) is not none else '' }}">
+  {{ err(errors, name) }}</label>
+{% endmacro %}
+
 {% block content %}
 <h1>Settings</h1>
 {% if note %}<p class="dim">{{ note }}</p>{% endif %}
 
 <section class="settings-section">
+  <h2>Search preferences</h2>
+  <p class="dim small">Just for {{ active.display_name }}. One item per line in the text boxes.</p>
+  {{ err(prefs_errors, "_form") }}
+  <form method="post" action="/p/{{ active.slug }}/settings/prefs/form" class="settings-form">
+    <fieldset>
+      <legend>What</legend>
+      {{ lines_field(prefs_values, prefs_errors, "titles", "Job titles", "Matched as part of the job title.") }}
+      {{ lines_field(prefs_values, prefs_errors, "seniority", "Seniority words", "Leave empty to skip the seniority check.") }}
+      {{ lines_field(prefs_values, prefs_errors, "exclude_keywords", "Exclude jobs mentioning") }}
+      <label class="field"><span>Minimum salary (USD, 0 for none)</span>
+        <input name="comp_floor_usd" inputmode="numeric" value="{{ prefs_values.get('comp_floor_usd', 0) }}">
+        {{ err(prefs_errors, "comp_floor_usd") }}</label>
+    </fieldset>
+    <fieldset>
+      <legend>Where</legend>
+      {{ location_field(prefs_values, prefs_errors, "search_locations", "Search in", "Where the job sites are searched. Pick a suggestion, or Remote.") }}
+      {{ checkbox(prefs_values, "remote_ok", "Remote jobs are OK") }}
+      {{ location_field(prefs_values, prefs_errors, "locations", "Keep jobs located in", "Matched as part of a job's location, so GA or a town name both work.") }}
+    </fieldset>
+    <fieldset>
+      <legend>Sources</legend>
+      {{ lines_field(prefs_values, prefs_errors, "indeed_queries", "Indeed searches") }}
+      {{ lines_field(prefs_values, prefs_errors, "linkedin_queries", "LinkedIn searches") }}
+      {{ lines_field(prefs_values, prefs_errors, "glassdoor_queries", "Glassdoor searches") }}
+      {{ lines_field(prefs_values, prefs_errors, "wellfound_queries", "Wellfound searches") }}
+      {{ lines_field(prefs_values, prefs_errors, "otta_queries", "Otta searches") }}
+      {{ lines_field(prefs_values, prefs_errors, "greenhouse_companies", "Greenhouse companies") }}
+      {{ lines_field(prefs_values, prefs_errors, "lever_companies", "Lever companies") }}
+      {{ lines_field(prefs_values, prefs_errors, "ashby_companies", "Ashby companies") }}
+      {{ lines_field(prefs_values, prefs_errors, "workable_companies", "Workable companies") }}
+      {{ lines_field(prefs_values, prefs_errors, "smartrecruiters_companies", "SmartRecruiters companies") }}
+      {{ lines_field(prefs_values, prefs_errors, "rss_urls", "RSS feed URLs") }}
+      {{ checkbox(prefs_values, "hn_enabled", "HN Who's Hiring") }}
+      {{ checkbox(prefs_values, "remoteok_enabled", "RemoteOK") }}
+      {{ checkbox(prefs_values, "remotive_enabled", "Remotive") }}
+    </fieldset>
+    <div><button type="submit">Save preferences</button></div>
+  </form>
+</section>
+
+<section class="settings-section">
+  <h2>Shared configuration</h2>
+  <p class="dim small">Used by every profile. The API key itself is never stored here, only the name of the environment variable that holds it.</p>
+  {{ err(config_errors, "_form") }}
+  <form method="post" action="/p/{{ active.slug }}/settings/config/form" class="settings-form">
+    <fieldset>
+      <legend>Anthropic and budget</legend>
+      {{ text_field(config_values, config_errors, "key_env_var", "API key environment variable") }}
+      {{ text_field(config_values, config_errors, "daily_usd", "Daily budget (USD)") }}
+      {{ text_field(config_values, config_errors, "monthly_usd", "Monthly budget (USD)") }}
+    </fieldset>
+    <fieldset>
+      <legend>Models</legend>
+      {{ text_field(config_values, config_errors, "embedding_model", "Embedding model") }}
+      {{ text_field(config_values, config_errors, "rerank_model", "Rerank model") }}
+      {{ text_field(config_values, config_errors, "top_k_for_llm_rerank", "Jobs sent to the rerank model") }}
+      {{ text_field(config_values, config_errors, "tailor_model", "Tailoring model") }}
+      {{ text_field(config_values, config_errors, "cover_paragraphs", "Cover letter paragraphs") }}
+    </fieldset>
+    <fieldset>
+      <legend>Files</legend>
+      {{ text_field(config_values, config_errors, "pdf_template", "PDF template path (optional)") }}
+    </fieldset>
+    <div><button type="submit">Save configuration</button></div>
+  </form>
+</section>
+
+<details class="settings-section" {% if config_error or prefs_error %}open{% endif %}>
+  <summary>Advanced: edit YAML</summary>
+
   <h2>Config <span class="dim">{{ config_path }}</span></h2>
   <p class="dim small">Shared across every profile.</p>
   {% if config_error %}<p class="error">{{ config_error }}</p>{% endif %}
@@ -12,9 +121,7 @@
     <textarea name="text" rows="24" cols="100" spellcheck="false">{{ config_text }}</textarea>
     <div><button type="submit">Save config</button></div>
   </form>
-</section>
 
-<section class="settings-section">
   <h2>Prefs <span class="dim">{{ prefs_path }}</span></h2>
   <p class="dim small">Just for {{ active.display_name }}.</p>
   {% if prefs_error %}<p class="error">{{ prefs_error }}</p>{% endif %}
@@ -22,5 +129,8 @@
     <textarea name="text" rows="24" cols="100" spellcheck="false">{{ prefs_text }}</textarea>
     <div><button type="submit">Save prefs</button></div>
   </form>
-</section>
+</details>
+
+<datalist id="place-options"></datalist>
+<script src="/static/settings.js" defer></script>
 {% endblock %}

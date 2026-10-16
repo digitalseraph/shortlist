@@ -226,3 +226,11 @@ dd { font-family: var(--mono); word-break: break-all; }
 .error { color: var(--danger); }
 .empty { color: var(--dim); font-style: italic; margin-top: 0.5rem; }
 a { color: var(--accent); }
+
+/* Settings forms */
+.settings-form fieldset { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: var(--gap); }
+.settings-form .field { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.75rem; max-width: 40rem; }
+.settings-form .field textarea, .settings-form .field input { width: 100%; }
+.settings-form .check { display: block; margin-bottom: 0.5rem; }
+.location-row { display: flex; gap: 0.5rem; margin-bottom: 0.25rem; }
+.location-row input { flex: 1; }
