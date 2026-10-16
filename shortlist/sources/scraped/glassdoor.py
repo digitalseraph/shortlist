@@ -80,14 +80,13 @@ def _parse_card(card: Tag) -> RawJob | None:
 
 
 def parse_search_html(html: str) -> list[RawJob]:
-    if any(m.lower() in html.lower() for m in _BAN_MARKERS):
-        raise GlassdoorBanDetectedError("ban marker found")
     soup = BeautifulSoup(html, "html.parser")
-    return [
-        rj
-        for card in soup.select('li[data-test="jobListing"]')
-        if (rj := _parse_card(card)) is not None
-    ]
+    cards = soup.select('li[data-test="jobListing"]')
+    # Normal results pages also load reCAPTCHA and carry "blocked" JSON flags,
+    # so a marker only means a ban when the page has no listings at all.
+    if not cards and any(m.lower() in html.lower() for m in _BAN_MARKERS):
+        raise GlassdoorBanDetectedError("ban marker found")
+    return [rj for card in cards if (rj := _parse_card(card)) is not None]
 
 
 class GlassdoorSource(Source):

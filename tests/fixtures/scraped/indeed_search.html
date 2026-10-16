@@ -1,20 +1,33 @@
 <!DOCTYPE html>
-<html><body>
+<html><head>
+<!-- Every real results page carries Cloudflare's script and this JSON flag;
+     neither is a ban. -->
+<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>
+<script>window.mosaic = {"isProfileInsightsBlocked": false};</script>
+</head><body>
 <div id="mosaic-provider-jobcards">
-  <ul class="jobsearch-ResultsList">
-    <li class="result">
-      <h2 class="jobTitle"><a href="/viewjob?jk=abc123" id="job_abc123">Senior Backend Engineer</a></h2>
-      <span data-testid="company-name">Acme Inc</span>
-      <div data-testid="text-location">Remote</div>
-      <div class="job-snippet">Build distributed services in Python.</div>
-      <span class="date">Posted 3 days ago</span>
+  <ul>
+    <li>
+      <div class="job_seen_beacon">
+        <table><tbody><tr><td class="resultContent">
+          <h3 class="jobTitle"><a class="jcs-JobTitle" data-jk="abc123" id="job_abc123" href="/rc/clk?jk=abc123&amp;bb=x"><span>Senior Backend Engineer</span></a></h3>
+          <span data-testid="company-name">Acme Inc</span>
+          <div data-testid="text-location">Remote</div>
+        </td></tr></tbody></table>
+        <div class="job-snippet">Build distributed services in Python.</div>
+        <span class="date">Posted 3 days ago</span>
+      </div>
     </li>
-    <li class="result">
-      <h2 class="jobTitle"><a href="/viewjob?jk=def456" id="job_def456">Staff SRE</a></h2>
-      <span data-testid="company-name">Globex</span>
-      <div data-testid="text-location">Atlanta, GA</div>
-      <div class="job-snippet">Run multi-region Kubernetes at scale.</div>
-      <span class="date">Posted 1 day ago</span>
+    <li>
+      <div class="job_seen_beacon">
+        <table><tbody><tr><td class="resultContent">
+          <h3 class="jobTitle"><a class="jcs-JobTitle" data-jk="def456" id="job_def456" href="/rc/clk?jk=def456&amp;bb=y"><span>Staff SRE</span></a></h3>
+          <span data-testid="company-name">Globex</span>
+          <div data-testid="text-location">Atlanta, GA</div>
+        </td></tr></tbody></table>
+        <div class="job-snippet">Run multi-region Kubernetes at scale.</div>
+        <span class="date">Posted 1 day ago</span>
+      </div>
     </li>
   </ul>
 </div>

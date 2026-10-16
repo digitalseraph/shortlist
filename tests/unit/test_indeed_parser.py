@@ -30,11 +30,9 @@ def test_parse_detects_ban_marker():
 
 def test_parse_handles_missing_optional_fields():
     html = """
-    <ul class="jobsearch-ResultsList">
-      <li class="result">
-        <h2 class="jobTitle"><a href="/viewjob?jk=zzz" id="job_zzz">Some Title</a></h2>
-      </li>
-    </ul>
+    <div class="job_seen_beacon">
+      <h3 class="jobTitle"><a data-jk="zzz" href="/rc/clk?jk=zzz">Some Title</a></h3>
+    </div>
     """
     jobs = parse_search_html(html, query="x")
     assert len(jobs) == 1

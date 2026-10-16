@@ -25,3 +25,12 @@ def test_parse_detects_captcha():
     html = "<html><body>captcha: please verify</body></html>"
     with pytest.raises(GlassdoorBanDetectedError):
         parse_search_html(html)
+
+
+def test_listings_page_mentioning_captcha_is_not_a_ban():
+    """Real results pages load reCAPTCHA scripts and JSON with "blocked" flags."""
+    html = (FIXTURES / "glassdoor_search.html").read_text()
+    html = html.replace(
+        "</body>", '<script src="/recaptcha.js"></script>{"isBlocked":false}</body>'
+    )
+    assert len(parse_search_html(html)) == 2

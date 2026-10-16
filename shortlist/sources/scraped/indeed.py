@@ -20,7 +20,12 @@ from shortlist.sources.base import Source
 logger = logging.getLogger(__name__)
 
 _BASE = "https://www.indeed.com/jobs"
-_BAN_MARKERS = ("Verify you are human", "challenge-platform", "blocked")
+# Text of Indeed's block pages. Not "challenge-platform" or "blocked": every
+# normal results page loads Cloudflare's challenge-platform script and carries
+# JSON flags such as "isProfileInsightsBlocked".
+_BAN_MARKERS = ("Verify you are human", "Additional Verification Required")
+# One job card on a results page.
+_CARD = "div.job_seen_beacon"
 
 
 class IndeedBanDetectedError(RuntimeError):
@@ -47,7 +52,7 @@ def _parse_relative_date(text: str, *, now: datetime | None = None) -> datetime:
 
 
 def _normalize_card(card: Tag) -> RawJob | None:
-    title_a = card.select_one("h2.jobTitle a")
+    title_a = card.select_one(".jobTitle a")
     if title_a is None:
         return None
     title = title_a.get_text(strip=True)
@@ -86,7 +91,7 @@ def parse_search_html(html: str, *, query: str) -> list[RawJob]:  # noqa: ARG001
     if any(m.lower() in html.lower() for m in _BAN_MARKERS):
         raise IndeedBanDetectedError("ban / captcha marker found in HTML")
     soup = BeautifulSoup(html, "html.parser")
-    return [rj for card in soup.select("li.result") if (rj := _normalize_card(card)) is not None]
+    return [rj for card in soup.select(_CARD) if (rj := _normalize_card(card)) is not None]
 
 
 class IndeedSource(Source):
@@ -122,7 +127,7 @@ class IndeedSource(Source):
                 logger.info("indeed: fetching %s", url)
                 try:
                     await page.goto(url, wait_until="domcontentloaded")
-                    await page.wait_for_selector("li.result", timeout=15_000)
+                    await page.wait_for_selector(_CARD, timeout=15_000)
                 except Exception as e:  # noqa: BLE001
                     logger.warning("indeed: page load failed for %r: %s", q, e)
                     continue
