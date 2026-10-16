@@ -35,6 +35,21 @@ def test_pdf_is_extracted() -> None:
     assert "David Miller" in extract_text(buf.getvalue(), "resume.pdf")
 
 
+def test_pdf_words_drawn_separately_stay_on_one_line() -> None:
+    """Google Docs places each word on its own; extraction must rejoin the line."""
+    pytest.importorskip("reportlab")
+    from reportlab.pdfgen.canvas import Canvas
+
+    buf = io.BytesIO()
+    canvas = Canvas(buf)
+    x = 72.0
+    for word in ("Certified", "educator", "with", "seven", "years"):
+        canvas.drawString(x, 720, word)
+        x += canvas.stringWidth(word + " ")
+    canvas.save()
+    assert extract_text(buf.getvalue(), "resume.pdf") == "Certified educator with seven years"
+
+
 def test_docx_is_extracted() -> None:
     from docx import Document
 

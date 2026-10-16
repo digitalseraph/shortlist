@@ -8,6 +8,7 @@ expected to show the result for review before saving it.
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 from collections.abc import Iterable
 from pathlib import Path
@@ -58,6 +59,12 @@ def _join_capped(parts: Iterable[str], sep: str) -> str:
     return sep.join(out).strip()
 
 
+def _tidy_layout(text: str) -> str:
+    """Drop the column padding layout mode adds, keeping at most one blank line."""
+    lines = (" ".join(line.split()) for line in text.splitlines())
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
 def _from_pdf(data: bytes) -> str:
     if not data.startswith(_PDF_MAGIC):
         raise UnsupportedResumeError("file does not look like a PDF")
@@ -65,7 +72,13 @@ def _from_pdf(data: bytes) -> str:
 
     try:
         reader = PdfReader(io.BytesIO(data))
-        return _join_capped((page.extract_text() or "" for page in reader.pages), "\n\n")
+        # Plain mode starts a new line for every separately placed run of text,
+        # and Google Docs places each word on its own, giving one word per line.
+        # Layout mode groups text by position on the page instead.
+        pages = (
+            _tidy_layout(page.extract_text(extraction_mode="layout") or "") for page in reader.pages
+        )
+        return _join_capped(pages, "\n\n")
     except UnsupportedResumeError:
         raise
     except Exception as exc:
