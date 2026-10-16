@@ -35,19 +35,25 @@ def _render_settings(
     error: str = "",
     text: str | None = None,
     code: int = 200,
+    editing_config: bool = False,
 ) -> HTMLResponse:
     """Render settings.html through page_context.
 
     When `error` is set, re-render the submitted `text` instead of what's on
-    disk — in whichever editor this request posted to, so nothing the person
-    typed is lost. Which editor that is comes from the request path itself
-    (config and prefs post to different routes), not an extra parameter. When
-    `text` is None (the GET view, or a successful save), both editors load
-    fresh from disk.
+    disk, so nothing the person typed is lost. `editing_config` says which
+    editor `text`/`error` belong to (True for config, False for prefs) — the
+    caller always knows which form it's handling, so it's passed explicitly
+    rather than guessed from the request. It's irrelevant when `text` is
+    None (the GET view, or a successful save), since both editors then just
+    load fresh from disk.
     """
-    editing_config = text is not None and request.url.path.endswith("/settings/config")
-    config_text = text if editing_config else _read(paths.config_path(), DEFAULT_CONFIG_YAML)
-    prefs_text = text if (text is not None and not editing_config) else _read(profile.prefs_path)
+    if text is not None and editing_config:
+        config_text, prefs_text = text, _read(profile.prefs_path)
+    elif text is not None:
+        config_text, prefs_text = _read(paths.config_path(), DEFAULT_CONFIG_YAML), text
+    else:
+        config_text = _read(paths.config_path(), DEFAULT_CONFIG_YAML)
+        prefs_text = _read(profile.prefs_path)
     html = (
         get_env(request)
         .get_template("settings.html")
@@ -79,12 +85,16 @@ def _save_yaml(
     path: Path,
     text: str,
     parse: Callable[[str], object],
+    *,
+    editing_config: bool,
 ) -> HTMLResponse:
     """Validate `text`, then write it verbatim so comments and ordering survive."""
     try:
         parse(text)
     except Exception as exc:  # noqa: BLE001 — yaml and pydantic raise unrelated types
-        return _render_settings(request, profile, error=str(exc), text=text, code=400)
+        return _render_settings(
+            request, profile, error=str(exc), text=text, code=400, editing_config=editing_config
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         backup = path.with_name(path.name + ".bak")
@@ -105,6 +115,7 @@ def save_prefs(
         profile.prefs_path,
         text,
         lambda s: Prefs(**(yaml.safe_load(s) or {})),
+        editing_config=False,
     )
 
 
@@ -120,4 +131,5 @@ def save_config(
         paths.config_path(),
         text,
         lambda s: Config(**(yaml.safe_load(s) or {})),
+        editing_config=True,
     )
