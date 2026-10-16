@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -169,3 +170,23 @@ def test_viewing_the_same_profile_twice_does_not_rewrite_state(
     )
     assert client.get("/p/david/").status_code == 200
     assert calls == []
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores file permissions")
+def test_page_still_loads_when_state_yaml_cannot_be_written(client: TestClient) -> None:
+    """Recording the last-used profile is a convenience; losing the write to
+    a read-only state.yaml must never turn a page view into a 500.
+    """
+    david = profiles.create("david", "David")
+    alex = profiles.create("alex", "Alex")
+    assert client.get(f"/p/{david.slug}/").status_code == 200
+
+    state_path = state._state_path()
+    state_path.chmod(0o444)
+    try:
+        # Switching to alex requires an actual write (the stored slug is
+        # david's), which must fail silently rather than 500 the page.
+        r = client.get(f"/p/{alex.slug}/")
+        assert r.status_code == 200
+    finally:
+        state_path.chmod(0o644)
