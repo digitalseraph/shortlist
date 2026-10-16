@@ -151,3 +151,5 @@ Coverage target: 80%. Current: 82%.
 ## License
 
 MIT.
+
+Place names for search-location autocomplete come from [GeoNames](https://www.geonames.org/) (CC BY 4.0).

@@ -56,6 +56,7 @@ packages = ["shortlist", "shortlist_tui", "shortlist_web"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "shortlist/templates/pdf-template.tex" = "shortlist/templates/pdf-template.tex"
+"shortlist/data/us_places.txt" = "shortlist/data/us_places.txt"
 "shortlist_web/templates" = "shortlist_web/templates"
 "shortlist_web/static" = "shortlist_web/static"
 
