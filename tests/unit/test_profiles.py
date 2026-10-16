@@ -63,6 +63,28 @@ def test_create_rejects_duplicate(env: Path) -> None:
         profiles.create("david", "David Again")
 
 
+def test_create_writes_profile_yaml_last_so_a_failed_create_can_be_retried(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """profile.yaml is the registry key: writing it before migrate() would
+    leave a listed-but-broken profile, and block retrying the same slug with
+    'already exists', if migrate() (or anything after it) failed.
+    """
+
+    def boom(*_a: object, **_k: object) -> None:
+        raise RuntimeError("boom")
+
+    with monkeypatch.context() as m:
+        m.setattr(profiles, "migrate", boom)
+        with pytest.raises(RuntimeError):
+            profiles.create("david", "David")
+
+    assert profiles.list_profiles() == []
+    # Retrying the same slug must succeed, not raise DuplicateProfileError.
+    prof = profiles.create("david", "David")
+    assert prof.slug == "david"
+
+
 def test_load_returns_display_name(env: Path) -> None:
     profiles.create("my-sister", "Alex")
     assert profiles.load("my-sister").display_name == "Alex"

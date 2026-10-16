@@ -6,8 +6,10 @@
   {% for p in profiles %}
   <li>
     <a href="/p/{{ p.slug }}/">{{ p.display_name }}</a>
-    <form method="post" action="/profiles/{{ p.slug }}/delete" class="inline-form">
-      <input name="confirm" placeholder="type {{ p.display_name }} to confirm" required>
+    <form method="post" action="/profiles/{{ p.slug }}/delete" class="inline-form"
+          onsubmit="return confirm('Delete this person and all of their data - jobs, resume, prefs, cost history and backups? This cannot be undone.')">
+      <input name="confirm" placeholder="type {{ p.display_name }} to confirm" required
+             title="Also deletes this person's backups/ folder. This cannot be undone.">
       <button type="submit" class="danger">Delete</button>
     </form>
   </li>

@@ -67,7 +67,14 @@ def switch_suffix(request: Request, profile: Profile) -> str:
 
 
 def page_context(request: Request, profile: Profile, **extra: object) -> dict[str, object]:
-    """Common template variables for any profile-scoped page."""
+    """Common template variables for any profile-scoped page.
+
+    Calls `list_profiles()` fresh on every render rather than caching it -
+    each call re-walks (and, via `load()`, repairs) every profile on disk.
+    Deliberate, per the design spec's "repair, don't hide": a profile fixed
+    up by hand between requests should show up fixed on the very next page
+    view, not after a server restart.
+    """
     return {
         "request": request,
         "active": profile,

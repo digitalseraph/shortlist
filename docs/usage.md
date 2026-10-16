@@ -69,7 +69,7 @@ shortlist db init          Create the SQLite database and run migrations
 shortlist db status        Show schema version and db path
 shortlist db backup        Write a timestamped backup copy
 
-shortlist config init      Write default config.yaml + prefs.yaml to ~/.config/shortlist/
+shortlist config init      Write default config.yaml to ~/.config/shortlist/ (profiles seed their own prefs.yaml)
 shortlist config show      Print current config + prefs
 
 shortlist fetch            Pull jobs from all enabled, non-cooled sources

@@ -85,19 +85,25 @@ def _build(slug: str, display_name: str) -> Profile:
 
 
 def create(slug: str, display_name: str) -> Profile:
-    """Create both directories, seed prefs.yaml, write profile.yaml, migrate a fresh database."""
+    """Create both directories, seed prefs.yaml, migrate a fresh database, write profile.yaml.
+
+    `profile.yaml` is written last: `list_profiles()`/`load()` key the
+    registry on its presence, so writing it first would list (and block
+    retrying) a profile that a later step in this function failed to finish
+    setting up.
+    """
     config_root, data_root = profile_dirs(slug)
     if (data_root / "profile.yaml").exists():
         raise DuplicateProfileError(f"profile {slug!r} already exists")
     config_root.mkdir(parents=True, exist_ok=True)
     data_root.mkdir(parents=True, exist_ok=True)
     (data_root / "output").mkdir(exist_ok=True)
-    (data_root / "profile.yaml").write_text(
-        yaml.safe_dump({"display_name": display_name}, sort_keys=False)
-    )
     prof = _build(slug, display_name)
     prof.prefs_path.write_text(DEFAULT_PREFS_YAML)
     migrate(prof.db_path)
+    (data_root / "profile.yaml").write_text(
+        yaml.safe_dump({"display_name": display_name}, sort_keys=False)
+    )
     return prof
 
 

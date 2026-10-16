@@ -71,7 +71,8 @@ Every page is scoped to a person at `/p/<slug>/...`, with a header dropdown to s
 | Job detail | `/p/<slug>/job/{id}` | Full JD, tailored resume/cover/notes previews, status tracker |
 | Applications | `/p/<slug>/applications` | Kanban columns by status (tailored → offer / rejected) |
 | Costs | `/p/<slug>/costs` | This person's spend, plus the combined total across everyone |
-| Settings | `/p/<slug>/settings` | Read-only view of config.yaml, prefs.yaml, and data paths |
+| Resume | `/p/<slug>/resume` | Upload or edit the resume used for ranking and tailoring |
+| Settings | `/p/<slug>/settings` | Editable, validated YAML editor for config.yaml and prefs.yaml |
 
 Old pre-multi-person bookmarks (`/`, `/applications`, `/costs`, `/settings`, `/resume`) still
 work - they redirect to the active profile's version. A bookmarked `/job/{id}` link does not:
