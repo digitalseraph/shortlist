@@ -57,7 +57,9 @@ def test_prefs_values_round_trip() -> None:
 
 def test_field_errors_maps_to_form_names() -> None:
     with pytest.raises(ValidationError) as info:
-        Prefs.model_validate(sf.prefs_data(_form(search_locations=["Brunswik, GA"])))
+        Prefs.model_validate(
+            sf.prefs_data(_form(search_locations=["Brunswik, GA"], comp_floor_usd="lots"))
+        )
     errors = sf.field_errors(info.value, sf.PREFS_ERROR_NAMES)
     assert errors["search_locations"] == "not a known place: 'Brunswik, GA'"
     assert "titles" in errors
@@ -94,3 +96,13 @@ def test_config_values_reads_nested_fields() -> None:
 
 def test_current_config_falls_back_to_default() -> None:
     assert "ranker" in sf.current_config(None)
+
+
+def test_empty_minimum_salary_means_zero() -> None:
+    assert sf.prefs_data(_form(comp_floor_usd="  "))["comp_floor_usd"] == "0"
+
+
+def test_config_data_handles_an_empty_section() -> None:
+    """`paths:` with nothing under it loads as None, not a dict."""
+    data = sf.config_data(_form(pdf_template="~/t.tex"), {"paths": None})
+    assert data["paths"] == {"pdf_template": "~/t.tex"}

@@ -228,7 +228,9 @@ dd { font-family: var(--mono); word-break: break-all; }
 a { color: var(--accent); }
 
 /* Settings forms */
-.settings-form fieldset { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: var(--gap); }
+.settings-form fieldset { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: var(--gap); padding: 0.75rem 1rem; }
+.settings-form legend { font-weight: 600; padding: 0 0.25rem; }
+.settings-form [data-add-location] { align-self: flex-start; }
 .settings-form .field { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.75rem; max-width: 40rem; }
 .settings-form .field textarea, .settings-form .field input { width: 100%; }
 .settings-form .check { display: block; margin-bottom: 0.5rem; }

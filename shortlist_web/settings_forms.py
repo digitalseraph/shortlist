@@ -73,7 +73,8 @@ def prefs_data(form: FormData) -> dict[str, object]:
     for f in BOOL_FIELDS:
         data[f] = f in form
     # Left as text: pydantic parses it, and reports a bad number on the field.
-    data["comp_floor_usd"] = str(form.get("comp_floor_usd", "")).strip()
+    # Empty means no minimum, as the label says.
+    data["comp_floor_usd"] = str(form.get("comp_floor_usd", "")).strip() or "0"
     return data
 
 
@@ -89,7 +90,10 @@ def config_data(form: FormData, current: dict[str, Any]) -> dict[str, Any]:
         value: str | None = str(form.get(name, "")).strip()
         if name == "pdf_template" and not value:
             value = None  # optional path: empty means unset
-        data.setdefault(section, {})[key] = value
+        # An empty section (`paths:` alone) loads as None, not a dict.
+        if not isinstance(data.get(section), dict):
+            data[section] = {}
+        data[section][key] = value
     return data
 
 

@@ -125,3 +125,11 @@ def test_config_form_writes_backup(client: TestClient) -> None:
     _write_default_config()
     client.post("/p/kat/settings/config/form", data=CONFIG_FORM)
     assert (paths.config_path().parent / "config.yaml.bak").read_text() == DEFAULT_CONFIG_YAML
+
+
+def test_successful_save_redirects_to_the_settings_page(client: TestClient) -> None:
+    """Post/redirect/get: refresh and the profile switcher then act on a GET page."""
+    r = client.post("/p/kat/settings/prefs/form", data=PREFS_FORM, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/p/kat/settings?saved=1"
+    assert "Saved." in client.get(r.headers["location"]).text

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import ValidationError
 
 from shortlist import paths
@@ -125,15 +125,23 @@ def _render_settings(
     return HTMLResponse(html, status_code=code)
 
 
+def _saved(profile: Profile) -> RedirectResponse:
+    """Post/redirect/get after a save: a refresh then re-reads instead of re-posting,
+    and the profile switcher (which keeps the current path) lands on a GET page."""
+    return RedirectResponse(f"/p/{profile.slug}/settings?saved=1", status_code=303)
+
+
 @router.get("/settings", response_class=HTMLResponse)
-def settings_view(request: Request, profile: Profile = Depends(profile_dep)) -> HTMLResponse:
-    return _render_settings(request, profile)
+def settings_view(
+    request: Request, profile: Profile = Depends(profile_dep), saved: bool = False
+) -> HTMLResponse:
+    return _render_settings(request, profile, note="Saved." if saved else "")
 
 
-@router.post("/settings/prefs/form", response_class=HTMLResponse)
+@router.post("/settings/prefs/form", response_class=HTMLResponse, response_model=None)
 async def save_prefs_form(
     request: Request, profile: Profile = Depends(profile_dep)
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     data = settings_forms.prefs_data(await request.form())
     try:
         prefs = Prefs.model_validate(data)
@@ -142,13 +150,13 @@ async def save_prefs_form(
         return _render_settings(request, profile, prefs_values=data, prefs_errors=errors, code=400)
     text = settings_forms.to_yaml(settings_forms.PREFS_HEADER, prefs)
     _write_with_backup(profile.prefs_path, text)
-    return _render_settings(request, profile, note="Saved.")
+    return _saved(profile)
 
 
-@router.post("/settings/config/form", response_class=HTMLResponse)
+@router.post("/settings/config/form", response_class=HTMLResponse, response_model=None)
 async def save_config_form(
     request: Request, profile: Profile = Depends(profile_dep)
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     path = paths.config_path()
     try:
         current = settings_forms.current_config(path.read_text() if path.exists() else None)
@@ -165,7 +173,7 @@ async def save_config_form(
             request, profile, config_values=submitted, config_errors=errors, code=400
         )
     _write_with_backup(path, settings_forms.to_yaml(settings_forms.CONFIG_HEADER, config))
-    return _render_settings(request, profile, note="Saved.")
+    return _saved(profile)
 
 
 def _save_yaml(
@@ -176,7 +184,7 @@ def _save_yaml(
     parse: Callable[[str], object],
     *,
     editing_config: bool,
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     """Validate `text`, then write it verbatim so comments and ordering survive."""
     try:
         parse(text)
@@ -185,15 +193,15 @@ def _save_yaml(
             request, profile, error=str(exc), text=text, code=400, editing_config=editing_config
         )
     _write_with_backup(path, text)
-    return _render_settings(request, profile, note="Saved.")
+    return _saved(profile)
 
 
-@router.post("/settings/prefs", response_class=HTMLResponse)
+@router.post("/settings/prefs", response_class=HTMLResponse, response_model=None)
 def save_prefs(
     request: Request,
     profile: Profile = Depends(profile_dep),
     text: str = Form(...),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     return _save_yaml(
         request,
         profile,
@@ -204,12 +212,12 @@ def save_prefs(
     )
 
 
-@router.post("/settings/config", response_class=HTMLResponse)
+@router.post("/settings/config", response_class=HTMLResponse, response_model=None)
 def save_config(
     request: Request,
     profile: Profile = Depends(profile_dep),
     text: str = Form(...),
-) -> HTMLResponse:
+) -> HTMLResponse | RedirectResponse:
     return _save_yaml(
         request,
         profile,
