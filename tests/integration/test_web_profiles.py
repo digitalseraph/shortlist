@@ -101,6 +101,18 @@ def test_no_profiles_redirects_to_first_run(client: TestClient) -> None:
     assert r.headers["location"] == "/profiles/new"
 
 
+def test_ambiguous_profiles_redirects_to_the_picker_not_first_run(client: TestClient) -> None:
+    """Two or more profiles and no state.yaml is the default state for anyone
+    who set up through the CLI - a pure-CLI install never writes state.yaml.
+    That must land on /profiles to pick, not /profiles/new to create another.
+    """
+    profiles.create("david", "David")
+    profiles.create("alex", "Alex")
+    r = client.get("/applications", follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers["location"] == "/profiles"
+
+
 def test_bare_path_redirect_preserves_the_query_string(client: TestClient) -> None:
     """A bookmarked sort/filter must survive the hop to the prefixed URL."""
     profiles.create("david", "David")

@@ -9,7 +9,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader
 
-from shortlist import profiles
+from shortlist import profiles, state
 from shortlist.profiles import Profile
 from shortlist.store.db import transition_status, update_application
 
@@ -33,11 +33,37 @@ def profile_dep(slug: str) -> Profile:
     raises ``InvalidSlugError`` before any not-found check runs) is just as
     unknown as a well-formed absent one, so every ``ProfileError`` — not only
     ``ProfileNotFoundError`` — 404s here instead of propagating as a 500.
+
+    Also records `slug` as the last-*used* profile — every page view resolves
+    through here, which is the whole point: "most recently used", not "most
+    recently created". Read before write so a normal page view does not
+    rewrite state.yaml on every request, only on an actual switch.
     """
     try:
-        return profiles.load(slug)
+        prof = profiles.load(slug)
     except profiles.ProfileError as exc:
         raise HTTPException(status_code=404, detail=f"no profile {slug!r}") from exc
+    if state.get_last_profile() != prof.slug:
+        state.set_last_profile(prof.slug)
+    return prof
+
+
+def switch_suffix(request: Request, profile: Profile) -> str:
+    """The part of the current path after `/p/<slug>`, for the profile switcher.
+
+    Switching rewrites the slug in the current path rather than always
+    landing on the job list, so you stay on the same page for a different
+    person. Falls back to "/" (that profile's job list) when the current
+    path cannot be mapped cleanly - e.g. it does not start with this
+    profile's own prefix.
+    """
+    prefix = f"/p/{profile.slug}"
+    path = request.url.path
+    if path == prefix:
+        return "/"
+    if path.startswith(prefix + "/"):
+        return path[len(prefix) :]
+    return "/"
 
 
 def page_context(request: Request, profile: Profile, **extra: object) -> dict[str, object]:
@@ -46,6 +72,7 @@ def page_context(request: Request, profile: Profile, **extra: object) -> dict[st
         "request": request,
         "active": profile,
         "all_profiles": profiles.list_profiles(),
+        "switch_suffix": switch_suffix(request, profile),
         **extra,
     }
 

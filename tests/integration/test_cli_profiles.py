@@ -52,6 +52,15 @@ def test_profile_delete_removes_it(env: Path) -> None:
     assert profiles.list_profiles() == []
 
 
+def test_profile_delete_rejects_a_malformed_slug_instead_of_crashing(env: Path) -> None:
+    """A typo (e.g. uppercase) must exit with a message, not an unhandled
+    InvalidSlugError traceback.
+    """
+    result = runner.invoke(app, ["profile", "delete", "David", "--yes"])
+    assert result.exit_code != 0
+    assert result.exception is None or isinstance(result.exception, SystemExit)
+
+
 def test_list_command_requires_a_profile_when_ambiguous(env: Path) -> None:
     profiles.create("david", "David")
     profiles.create("alex", "Alex")

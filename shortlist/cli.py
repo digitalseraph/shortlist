@@ -113,7 +113,7 @@ def profile_delete(
         typer.confirm(f"Delete profile {slug!r} and all of its data?", abort=True)
     try:
         profiles.delete(slug)
-    except profiles.ProfileNotFoundError as exc:
+    except profiles.ProfileError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
     typer.echo(f"deleted {slug}")

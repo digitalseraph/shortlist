@@ -102,13 +102,25 @@ def create(slug: str, display_name: str) -> Profile:
 
 
 def load(slug: str) -> Profile:
-    """Load a profile, repairing missing config dir/prefs.yaml rather than hiding them."""
+    """Load a profile, repairing missing config dir/prefs.yaml rather than hiding them.
+
+    The repair (mkdir + seeding prefs.yaml below) runs on every load, not just
+    the first - "repair, don't hide" per the design spec, so a config dir or
+    prefs.yaml removed by hand comes back instead of 404ing forever.
+    """
     config_root, data_root = profile_dirs(slug)
     meta = data_root / "profile.yaml"
     if not meta.exists():
         raise ProfileNotFoundError(f"no profile {slug!r}")
+    try:
+        data = yaml.safe_load(meta.read_text())
+    except yaml.YAMLError as exc:
+        raise ProfileNotFoundError(f"profile {slug!r} has a malformed profile.yaml") from exc
+    if data is None:
+        data = {}
+    elif not isinstance(data, dict):
+        raise ProfileNotFoundError(f"profile {slug!r} has a malformed profile.yaml")
     config_root.mkdir(parents=True, exist_ok=True)
-    data = yaml.safe_load(meta.read_text()) or {}
     prof = _build(slug, str(data.get("display_name", slug)))
     if not prof.prefs_path.exists():
         prof.prefs_path.write_text(DEFAULT_PREFS_YAML)
@@ -116,15 +128,22 @@ def load(slug: str) -> Profile:
 
 
 def list_profiles() -> list[Profile]:
-    """Every profile on disk, ordered by display name."""
+    """Every profile on disk, ordered by display name.
+
+    A profile whose profile.yaml is malformed is skipped rather than taking
+    the whole listing down with it - one bad file must not 500 every page.
+    """
     root = paths.data_dir() / "profiles"
     if not root.is_dir():
         return []
-    found = [
-        load(child.name)
-        for child in sorted(root.iterdir())
-        if child.is_dir() and (child / "profile.yaml").exists()
-    ]
+    found: list[Profile] = []
+    for child in sorted(root.iterdir()):
+        if not child.is_dir() or not (child / "profile.yaml").exists():
+            continue
+        try:
+            found.append(load(child.name))
+        except ProfileError:
+            continue
     return sorted(found, key=lambda p: p.display_name.lower())
 
 

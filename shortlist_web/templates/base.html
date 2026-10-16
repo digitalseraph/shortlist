@@ -30,7 +30,7 @@
     </nav>
     <select class="profile-switcher" onchange="location.href=this.value">
       {% for p in all_profiles %}
-      <option value="/p/{{ p.slug }}/" {% if p.slug == active.slug %}selected{% endif %}>
+      <option value="/p/{{ p.slug }}{{ switch_suffix }}" {% if p.slug == active.slug %}selected{% endif %}>
         {{ p.display_name }}
       </option>
       {% endfor %}

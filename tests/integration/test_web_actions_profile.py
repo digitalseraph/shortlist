@@ -149,3 +149,24 @@ def test_tailor_writes_under_the_profiles_own_output_dir(
 
     assert any(david.output_dir.iterdir()), "nothing was written under the profile's output_dir"
     assert not decoy_output.exists(), "the shared/legacy cfg.paths.output_dir must never be used"
+
+
+@pytest.mark.parametrize(
+    "path,data",
+    [
+        ("/rank", {"mode": "no-llm"}),
+        ("/rank/selected", {"job_ids": [1]}),
+        ("/tailor/1", {}),
+    ],
+)
+def test_action_on_a_fresh_install_without_config_yaml_is_400_not_500(
+    client: TestClient, path: str, data: dict
+) -> None:
+    """Creating a first profile entirely through the web UI, with no
+    config.yaml yet (no `shortlist config init` ever run), must give a
+    styled 400 toast naming how to fix it - not an unexplained 500.
+    """
+    profiles.create("david", "David")
+    r = client.post(f"/p/david{path}", data=data)
+    assert r.status_code == 400
+    assert "config init" in r.text or "config.yaml" in r.text

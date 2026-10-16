@@ -108,3 +108,46 @@ async def test_rank_worker_uses_the_profiles_own_resume(tmp_path: Path, monkeypa
 
     assert captured["resume_path"] == profile.resume_path
     assert captured["resume_path"] != decoy_resume
+
+
+@pytest.mark.asyncio
+async def test_rank_worker_notifies_on_missing_resume_without_crashing(tmp_path: Path, monkeypatch):
+    """Same guard _tailor_worker already has: a missing resume must produce
+    a notification, not an unhandled exception that tears down the app.
+    """
+    db = tmp_path / "db.sqlite"
+    migrate(db)
+    cfg_dir = tmp_path / "cfg"
+    cfg_dir.mkdir()
+    monkeypatch.setenv("SHORTLIST_CONFIG_HOME", str(cfg_dir))
+    monkeypatch.setenv("SHORTLIST_DATA_HOME", str(tmp_path / "data"))
+    (cfg_dir / "config.yaml").write_text(
+        "anthropic:\n"
+        "  key_source: env\n"
+        "  key_env_var: ANTHROPIC_API_KEY\n"
+        "budget:\n"
+        "  daily_usd: 5.0\n"
+        "  monthly_usd: 60.0\n"
+        "paths: {}\n"
+        "sources: {}\n"
+        "ranker:\n"
+        "  top_k_for_llm_rerank: 30\n"
+        "  embedding_model: bge-small-en-v1.5\n"
+        "  rerank_model: claude-haiku-4-5-20251001\n"
+        "tailor:\n"
+        "  model: claude-sonnet-4-6\n"
+        "  cover_paragraphs: 3\n"
+    )
+
+    profile = _profile(db)  # resume_path is never written - does not exist
+
+    import shortlist_tui.app as app_mod
+
+    monkeypatch.setattr(app_mod, "load_prefs", lambda *_a, **_k: MagicMock())
+
+    async with ShortlistApp(profile=profile).run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("R")
+        await pilot.app.workers.wait_for_complete()
+        # No exception propagated - the app is still alive and responsive.
+        await pilot.pause()

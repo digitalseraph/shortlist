@@ -47,7 +47,12 @@ def create_app() -> FastAPI:
             return cast(Response, await call_next(request))
         try:
             active = profiles.resolve()
+        except profiles.AmbiguousProfileError:
+            # Several profiles exist and nothing (yet) says which one - let
+            # the person pick, rather than sending them to create a new one.
+            return RedirectResponse("/profiles", status_code=307)
         except profiles.ProfileError:
+            # No profiles exist at all - this is the actual first-run case.
             return RedirectResponse("/profiles/new", status_code=307)
         # "/" itself needs the trailing slash — job_list is registered at
         # "/p/{slug}/", and a bare "/p/{slug}" would just trigger a second,

@@ -115,3 +115,49 @@ def test_load_repairs_missing_config_dir(env: Path) -> None:
     assert again.prefs_path.parent.is_dir()
     assert again.prefs_path.exists()
     load_prefs(again.prefs_path)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "invalid: yaml: content: [",  # unparseable
+        "- just\n- a\n- list\n",  # parses, but not a mapping
+        "just a plain string",  # parses, but not a mapping
+    ],
+)
+def test_load_raises_not_found_on_malformed_profile_yaml(env: Path, content: str) -> None:
+    """A malformed profile.yaml must 404-equivalent (ProfileNotFoundError), not
+    crash with an unhandled YAMLError or AttributeError (`str`/`list` has no
+    `.get`).
+    """
+    prof = profiles.create("david", "David")
+    (prof.db_path.parent / "profile.yaml").write_text(content)
+    with pytest.raises(profiles.ProfileNotFoundError):
+        profiles.load("david")
+
+
+def test_load_accepts_empty_profile_yaml(env: Path) -> None:
+    """An empty profile.yaml is fine - falls back to the slug as display name."""
+    prof = profiles.create("david", "David")
+    (prof.db_path.parent / "profile.yaml").write_text("")
+    again = profiles.load("david")
+    assert again.display_name == "david"
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "invalid: yaml: content: [",
+        "- just\n- a\n- list\n",
+        "just a plain string",
+    ],
+)
+def test_list_profiles_skips_a_malformed_entry_rather_than_500ing(env: Path, content: str) -> None:
+    """One profile with a malformed profile.yaml must not take down the
+    listing for everyone else.
+    """
+    good = profiles.create("alex", "Alex")
+    bad = profiles.create("david", "David")
+    (bad.db_path.parent / "profile.yaml").write_text(content)
+    found = profiles.list_profiles()
+    assert [p.slug for p in found] == [good.slug]
