@@ -12,6 +12,7 @@ from starlette.responses import RedirectResponse, Response
 
 from shortlist import profiles
 from shortlist_web.routes import actions, applications, costs, jobs, resume, settings
+from shortlist_web.routes import places as places_router
 from shortlist_web.routes import profiles as profiles_router
 
 # Pages that existed before profiles were URL-scoped. A request for one of
@@ -66,6 +67,8 @@ def create_app() -> FastAPI:
     # profiles.router is unprefixed: it exists precisely for when there is no
     # active profile.
     app.include_router(profiles_router.router)
+    # Place suggestions are the same for everyone, so not profile-scoped either.
+    app.include_router(places_router.router)
     for router in (
         jobs.router,
         applications.router,
