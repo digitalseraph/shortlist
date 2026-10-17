@@ -20,6 +20,8 @@ PREFS_FORM = {
     "remote_ok": "on",
     "comp_floor_usd": "0",
     "indeed_queries": "French teacher",
+    "usajobs_queries": "French teacher",
+    "applitrack_districts": "glynnco\ncamdencounty",
 }
 
 CONFIG_FORM = {
@@ -56,7 +58,10 @@ def test_prefs_form_saves_and_reloads(client: TestClient) -> None:
     assert prefs.search_locations == ["Brunswick, GA", "Remote"]
     assert prefs.seniority == []
     assert prefs.indeed_queries == ["French teacher"]
+    assert prefs.usajobs_queries == ["French teacher"]
+    assert prefs.applitrack_districts == ["glynnco", "camdencounty"]
     page = client.get("/p/kat/settings").text
+    assert "glynnco\ncamdencounty</textarea>" in page
     assert 'value="Brunswick, GA"' in page
     assert 'value="St. Simons"' in page
 

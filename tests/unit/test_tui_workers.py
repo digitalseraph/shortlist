@@ -85,3 +85,18 @@ def test_tailor_one_writes_outputs(tmp_path: Path):
     assert "tailored" in summary
     dirs = list(out_root.iterdir())
     assert len(dirs) == 1
+
+
+def test_build_sources_adds_school_district_and_usajobs_sources():
+    from shortlist.sources.ats.applitrack import AppliTrackSource
+    from shortlist.sources.curated.usajobs import USAJobsSource
+    from shortlist_tui.workers import _build_sources
+
+    prefs = _prefs(
+        applitrack_districts=["glynnco"],
+        usajobs_queries=["French teacher"],
+        search_locations=["Brunswick, GA"],
+    )
+    sources = _build_sources(prefs)
+    assert [type(s) for s in sources] == [AppliTrackSource, USAJobsSource]
+    assert sources[1].search_params()[0]["LocationName"] == "Brunswick, GA"

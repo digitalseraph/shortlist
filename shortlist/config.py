@@ -161,7 +161,10 @@ class Prefs(BaseModel):
     wellfound_queries: list[str] = Field(default_factory=list)
     otta_queries: list[str] = Field(default_factory=list)
     rss_urls: list[str] = Field(default_factory=list)
-    # Where Indeed, LinkedIn and Glassdoor search. Unlike `locations` (a
+    # AppliTrack district codes, e.g. "glynnco" in applitrack.com/glynnco/.
+    applitrack_districts: list[str] = Field(default_factory=list)
+    usajobs_queries: list[str] = Field(default_factory=list)
+    # Where Indeed, LinkedIn, Glassdoor and USAJOBS search. Unlike `locations` (a
     # substring filter on fetched jobs), each entry must be a known place.
     search_locations: list[str] = Field(default_factory=list)
 
@@ -194,6 +197,8 @@ class Prefs(BaseModel):
         "wellfound_queries",
         "otta_queries",
         "rss_urls",
+        "applitrack_districts",
+        "usajobs_queries",
     )
     @classmethod
     def _strip(cls, v: list[str]) -> list[str]:

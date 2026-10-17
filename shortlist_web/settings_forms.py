@@ -36,6 +36,8 @@ LINE_FIELDS = (
     "workable_companies",
     "smartrecruiters_companies",
     "rss_urls",
+    "applitrack_districts",
+    "usajobs_queries",
 )
 # One input per location, with suggestions.
 LOCATION_FIELDS = ("locations", "search_locations")

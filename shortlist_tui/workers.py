@@ -16,6 +16,7 @@ from shortlist.config import Config, Prefs
 from shortlist.ranker.embeddings import EmbeddingService
 from shortlist.ranker.llm_rerank import LLMReranker
 from shortlist.ranker.pipeline import rerank_jobs, run_pipeline
+from shortlist.sources.ats.applitrack import AppliTrackSource
 from shortlist.sources.ats.ashby import AshbySource
 from shortlist.sources.ats.greenhouse import GreenhouseSource
 from shortlist.sources.ats.lever import LeverSource
@@ -25,6 +26,7 @@ from shortlist.sources.base import Source
 from shortlist.sources.curated.hn_who_hiring import HNWhoHiringSource
 from shortlist.sources.curated.remoteok import RemoteOKSource
 from shortlist.sources.curated.remotive import RemotiveSource
+from shortlist.sources.curated.usajobs import USAJobsSource
 from shortlist.sources.feeds.rss import RSSSource
 from shortlist.sources.scraped.glassdoor import GlassdoorBanDetectedError, GlassdoorSource
 from shortlist.sources.scraped.indeed import IndeedBanDetectedError, IndeedSource
@@ -79,6 +81,12 @@ def _build_sources(prefs: Prefs) -> list[Source]:
         sources.append(OttaSource(queries=prefs.otta_queries))
     if prefs.rss_urls:
         sources.append(RSSSource(urls=prefs.rss_urls))
+    if prefs.applitrack_districts:
+        sources.append(AppliTrackSource(districts=prefs.applitrack_districts))
+    if prefs.usajobs_queries:
+        sources.append(
+            USAJobsSource(queries=prefs.usajobs_queries, locations=prefs.search_locations)
+        )
     return sources
 
 
