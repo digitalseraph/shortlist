@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 
+import click
 import httpx
 import pytest
 import respx
@@ -446,8 +447,9 @@ def test_cli_tui_help_does_not_error(env):
     assert result.exit_code == 0
     assert "TUI" in result.output or "tui" in result.output.lower()
     # The TUI has no in-app profile switcher, so --profile is its only way
-    # to pick a person; every other data command has it too.
-    assert "--profile" in result.output
+    # to pick a person; every other data command has it too. Unstyled
+    # because Rich colours help on GitHub Actions, splitting "--profile".
+    assert "--profile" in click.unstyle(result.output)
 
 
 def test_cli_tui_exits_cleanly_with_no_profiles(tmp_path, monkeypatch):
