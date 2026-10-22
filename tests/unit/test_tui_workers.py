@@ -100,3 +100,18 @@ def test_build_sources_adds_school_district_and_usajobs_sources():
     sources = _build_sources(prefs)
     assert [type(s) for s in sources] == [AppliTrackSource, USAJobsSource]
     assert sources[1].search_params()[0]["LocationName"] == "Brunswick, GA"
+
+
+def test_cli_and_tui_build_the_same_sources():
+    from shortlist.cli import _build_sources as cli_build
+    from shortlist_tui.workers import _build_sources as tui_build
+
+    # Switch on every source so a new one added to only one builder fails here.
+    every: dict[str, object] = {
+        name: ["x"]
+        for name in Prefs.model_fields
+        if name.endswith(("_companies", "_queries", "_districts")) or name == "rss_urls"
+    }
+    every |= {name: True for name in Prefs.model_fields if name.endswith("_enabled")}
+    prefs = _prefs(**every)
+    assert [type(s) for s in cli_build(prefs)] == [type(s) for s in tui_build(prefs)]
